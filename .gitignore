@@ -1,0 +1,11 @@
+/rabbitmq
+/librdkafka
+mini3
+*.log
+*.xml
+request*.json
+prefixes.json
+/database
+autotest2.php
+chain.php
+git_back
