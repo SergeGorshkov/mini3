@@ -22,8 +22,7 @@ sudo make install
 Сборка mini3 - выполняем из папки mini3  
 /usr/bin/gcc -m64 -lcrypto -lpthread -lstdc++ -lrabbitmq -lrdkafka -g0 mini3.cpp -o /path/to/mini3  
 (/path/to заменить на путь к папке с исходниками)  
-  
-Далее нужно указать путь к папке, где будет создана база данных, и (опционально) параметры соединения с раббитом или кафкой в config.json. В rabbitmq создать очередь ARCHIGRAPH_SYNC.  
+
 После этого можно запускать сервер, например:  
 ./mini3 8081  
 
