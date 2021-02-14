@@ -1,10 +1,24 @@
 
+struct condition {
+    char obj[MAX_VALUE_LEN];
+    int var;                    // corresponding variable
+    int dep;                    // dependence score
+    int n;                      // number of conditions
+    int cond_p[32];             // reference to other variables (predicate)
+    int cond_o[32];             // reference to other variables (object)
+    int n_cand;                 // number of candidates
+    char **cand;                // id of candidate of this variable's value
+    char **cand_s;              // subject leading to this candidate
+    char **cand_l;              // linkage (predicate or object) leading from subject to this candidate
+};
+
 class request {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0;
+    int _n_triples = 0, _n_prefixes = 0, _n_cond = 0, depth = 0;
     local_triple _triples[1024];
     prefix _prefixes[1024];
+    condition _cond[32];
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
@@ -13,7 +27,7 @@ public:
     bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int *pip) {
         int r = 0, pos = 0, status = 0;
         char *t, subject[MAX_VALUE_LEN], predicate[MAX_VALUE_LEN], object[MAX_VALUE_LEN], datatype[MAX_VALUE_LEN], lang[8];
-        bool in_method = false, in_id = false, in_pattern = false, in_prefix = false;
+        bool in_method = false, in_id = false, in_pattern = false, in_chain = false, in_prefix = false;
 
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
@@ -57,6 +71,13 @@ public:
                     goto send_parse_error;
                 subject[0] = predicate[0] = object[0] = datatype[0] = lang[0] = 0;
             }
+            else if(in_chain && tokens[i].type == 2 && subject[0] && operation == OP_GET) {
+                pos = 0;
+                *message = this->make_triple(subject, predicate, object, datatype, lang);
+                if(status == -1)
+                    goto send_parse_error;
+                subject[0] = predicate[0] = object[0] = datatype[0] = lang[0] = 0;
+            }
             else if(in_prefix && (subject[0] || object[0]) && (tokens[i].type == 1 || tokens[i].type == 2)) {
                 pos = 0;
                 if(*message = this->make_prefix(subject, object))
@@ -65,7 +86,7 @@ public:
             }
             
             if(tokens[i].type == 3 && t[0] != '{') {
-                if(!in_pattern && !in_prefix) strtolower(t);
+                if(!in_pattern && !in_chain && !in_prefix) strtolower(t);
                 else descreen(t);
                 if(strcmp(t, "method") == 0) {
                     in_method = true; continue;
@@ -73,7 +94,7 @@ public:
                 if(strcmp(t, "requestid") == 0) {
                     in_id = true; continue;
                 }
-                if(strcmp(t, "pattern") == 0 || strcmp(t, "triple") == 0) {
+                if(strcmp(t, "pattern") == 0 || strcmp(t, "chain") == 0 || strcmp(t, "triple") == 0) {
                     if(!endpoint) endpoint = EP_TRIPLE;
                     if(endpoint != EP_TRIPLE) {
                         *message = (char*)malloc(128);
@@ -81,7 +102,9 @@ public:
                         this->free_all();
                         goto send_parse_error;
                     }
-                    in_pattern = true; continue;
+                    if(strcmp(t, "pattern") == 0) in_pattern = true; 
+                    else in_chain = true;
+                    continue;
                 }
                 if(strcmp(t, "prefix") == 0) {
                     if(!endpoint) endpoint = EP_PREFIX;
@@ -114,7 +137,7 @@ public:
                     strcpy(this->type, t);
                     in_method = false;
                 }
-                else if(in_pattern) {
+                else if(in_pattern || in_chain) {
                     if(tokens[i].end - tokens[i].start > MAX_VALUE_LEN - 1) {
                         *message = (char*)malloc(128 + tokens[i].end - tokens[i].start);
                         sprintf(*message, "Token is too long: %s", t);
@@ -165,6 +188,11 @@ public:
             if(status == -1)
                 goto send_parse_error;
         }
+        else if(in_chain && subject[0] && operation == OP_GET) {
+            *message = this->make_triple(subject, predicate, object, datatype, lang);
+            if(status == -1)
+                goto send_parse_error;
+        }
         free(buffer); buffer = NULL;
         free(t); t = NULL;
 
@@ -182,6 +210,11 @@ public:
         else if(this->_n_send && operation == OP_GET) {
             logger(LOG, "GET triples request", this->request_id, 0);
             *message = this->return_triples();
+            return true;
+        }
+        else if(this->_n_triples && this->_n_cond && operation == OP_GET) {
+            logger(LOG, "GET triples request", this->request_id, 0);
+            *message = this->return_triples_chain();
             return true;
         }
         else if(this->_n_delete && operation == OP_DELETE) {
@@ -263,6 +296,12 @@ public:
             *status = -1;
             return message;
         }
+        if(this->_n_cond > 0) {
+            message = (char*)malloc(128);
+            sprintf(message, "Variables are not allowed in patterns; use Chain parameter");
+            *status = -1;
+            return message;
+        }
         memset(&this->_triples[this->_n_triples], 0, sizeof(triple));
         unsigned long n = 0;
         unsigned long *res = find_matching_triples(subject, predicate, object, datatype, lang, &n);
@@ -295,6 +334,18 @@ public:
     char *resolve_prefix(char *s) {
         char st[MAX_VALUE_LEN];
         if(strncmp(s, "http", 4) == 0 || s[0]=='*') return NULL;
+        if(s[0] == '?') {
+            bool found = false;
+            for(int i=0; i<this->_n_cond; i++) {
+                if(strcmp(this->_cond[i].obj, s) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if(!found && this->_n_cond < 32)
+                strcpy(this->_cond[this->_n_cond++].obj, s);
+            return NULL;
+        }
         for(int i=0; i<*n_prefixes; i++) {
             if(strncmp(s, prefixes[i].shortcut, prefixes[i].len) == 0 && s[prefixes[i].len] == ':') {
                 if(strlen(prefixes[i].value) + strlen(s) + 1 > MAX_VALUE_LEN) {
@@ -382,6 +433,172 @@ public:
             strcat(answer, ans);
         }
         strcat(answer, "]}");
+        return answer;
+    }
+
+    int find_cond(char *obj) {
+        for(int j=0; j<this->_n_cond; j++) {
+            if(strcmp(obj, this->_cond[j].obj) == 0)
+                return j;
+        }
+        return -1;
+    }
+
+    int add_cond(char *obj) {
+        strcpy(this->_cond[this->_n_cond].obj, obj);
+        return this->_n_cond++;
+    }
+
+    void propagate_dependent(int i) {
+        this->depth++;
+        if(this->depth > 10) return;
+        this->_cond[i].dep++;
+        for(int j=0; j<this->_cond[i].n; j++) {
+            if(this->_cond[this->_cond[i].cond_p[j]].obj[0] == '?')
+                propagate_dependent(this->_cond[i].cond_p[j]);
+            if(this->_cond[this->_cond[i].cond_o[j]].obj[0] == '?')
+                propagate_dependent(this->_cond[i].cond_o[j]);
+        }
+    }
+
+    void add_candidate(int i, char *s, char *subject, char *linkage) {
+printf("add candidate %s\n", s);
+        bool found = false;
+        for(int j=0; j<this->_cond[i].n_cand; j++) {
+            if(strcmp(this->_cond[i].cand[j], s) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if(found) return;
+        if(!this->_cond[i].cand) {
+            this->_cond[i].cand = (char**)malloc(1024*sizeof(char*));
+            this->_cond[i].cand_s = (char**)malloc(1024*sizeof(char*));
+            this->_cond[i].cand_l = (char**)malloc(1024*sizeof(char*));
+        }
+        else if(this->_cond[i].n_cand % 1024 == 0) {
+            this->_cond[i].cand = (char**)realloc(this->_cond[i].cand, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
+            this->_cond[i].cand_s = (char**)realloc(this->_cond[i].cand_s, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
+            this->_cond[i].cand_l = (char**)realloc(this->_cond[i].cand_l, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
+        }
+        this->_cond[i].cand[this->_cond[i].n_cand] = s;
+        this->_cond[i].cand_s[this->_cond[i].n_cand] = subject;
+        this->_cond[i].cand_l[this->_cond[i].n_cand] = linkage;
+        this->_cond[i].n_cand++;
+    }
+
+    void get_candidates(int i, int j, char *subject, char *predicate, char *object) {
+        unsigned long n = 0;
+printf("Find %s - %s - %s\n", subject, predicate, object);
+        unsigned long *res = find_matching_triples(subject, predicate, object, NULL, NULL, &n);
+        for(unsigned long k=0; k<n; k++) {
+            if(subject[0] == '*')
+                add_candidate(i, get_string(triples[res[k]].s_pos), NULL, NULL);
+            if(predicate[0] == '*')
+                add_candidate(this->_cond[i].cond_p[j], get_string(triples[res[k]].p_pos), subject, object);
+            if(object[0] == '*')
+                add_candidate(this->_cond[i].cond_o[j], get_string(triples[res[k]].o_pos), subject, predicate);
+        }
+        free(res);
+    }
+
+    char *return_triples_chain(void) {
+//logger(LOG, "(child) Return triples chain", "", this->_n_send);
+        int order[32], max_dep = 0, n = 0;
+        char star[2] = "*";
+        memset(order, 0, sizeof(int)*32);
+
+        // Заполняем условия
+        for(int i=0; i<this->_n_triples; i++) {
+            int ics = find_cond(this->_triples[i].s);
+            if(ics == -1) ics = add_cond(this->_triples[i].s);
+            int icp = find_cond(this->_triples[i].p);
+            if(icp == -1) icp = add_cond(this->_triples[i].p);
+            int ico = find_cond(this->_triples[i].o);
+            if(ico == -1) ico = add_cond(this->_triples[i].o);
+            this->_cond[ics].cond_p[this->_cond[ics].n] = icp;
+            this->_cond[ics].cond_o[this->_cond[ics].n++] = ico;
+            if(this->_cond[icp].obj[0] == '?') this->_cond[icp].dep++;
+            if(this->_cond[ico].obj[0] == '?') this->_cond[ico].dep++;
+        }
+        // Определяем зависимость переменных, чтобы установить порядок расчета
+        for(int i=0; i<this->_n_cond; i++) {
+            for(int j=0; j<this->_cond[i].n; j++) {
+                if(this->_cond[this->_cond[i].cond_p[j]].obj[0] == '?')
+                    propagate_dependent(this->_cond[i].cond_p[j]);
+                if(this->_cond[this->_cond[i].cond_o[j]].obj[0] == '?')
+                    propagate_dependent(this->_cond[i].cond_o[j]);
+            }
+        }
+        // Ищем наибольшую зависимость
+        for(int i=0; i<this->_n_cond; i++) {
+            if(this->_cond[i].dep > max_dep)
+                max_dep = this->_cond[i].dep;
+        }
+        // Строим массив с порядком обхода условий (определения переменных)
+        for(int i=0; i<=max_dep; i++) {
+            for(int j=0; j<this->_n_cond; j++) {
+                if(this->_cond[j].dep == i)
+                    order[n++] = j;
+            }
+        }
+        // По очереди определяем значения переменных
+        for(int x=0; x<n; x++) {
+            int i = order[x];
+            char *subject = this->_cond[i].obj;
+            // Цикл по условиям на определенный субъект
+            for(int j=0; j<this->_cond[i].n; j++) {
+printf("\n");
+                char *predicate = this->_cond[this->_cond[i].cond_p[j]].obj;
+                char *object = this->_cond[this->_cond[i].cond_o[j]].obj;
+                if(this->_cond[i].obj[0] == '?' && this->_cond[i].n_cand) {
+                    for(int l=0; l<this->_cond[i].n_cand; l++)
+                        get_candidates(i, j, this->_cond[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                }
+                else
+                    get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+            }
+        }
+
+printf("\nConditions:\n");
+for(int x=0; x<n; x++) {
+    int i = order[x];
+    if(this->_cond[i].obj[0] != '?' && this->_cond[i].n == 0)
+        continue;
+    printf("%i:\t%s, dep = %i\n", i, this->_cond[i].obj, this->_cond[i].dep);
+    for(int j=0; j<this->_cond[i].n; j++)
+        printf("\t\t%s => %s\n", this->_cond[this->_cond[i].cond_p[j]].obj, this->_cond[this->_cond[i].cond_o[j]].obj);
+    if(!this->_cond[i].n_cand) continue;
+    printf("\tCandidates:\n");
+    for(int j=0; j<this->_cond[i].n_cand; j++) {
+        printf("\t\t%s", this->_cond[i].cand[j]);
+        if(this->_cond[i].cand_s[j])
+            printf("\t(%s -> %s)", this->_cond[i].cand_s[j], this->_cond[i].cand_l[j]);
+        printf("\n");
+    }
+}
+
+        char *answer = (char*)malloc(1024);
+        sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\"}");
+/*
+        char *answer = (char*)malloc(this->_n_send*1024*10);
+        sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Triples\":[", this->request_id);
+        for(int i=0; i<this->_n_send; i++) {
+            char ans[1024*10];
+            sprintf(ans, "[\"%s\", \"%s\", \"%s\"", get_string(triples[this->_to_send[i]].s_pos), get_string(triples[this->_to_send[i]].p_pos), get_string(triples[this->_to_send[i]].o_pos));
+            if( triples[this->_to_send[i]].d_len || triples[this->_to_send[i]].l[0]) {
+                char *dt = get_string(triples[this->_to_send[i]].d_pos);
+                if(dt) sprintf((char*)((unsigned long)ans + strlen(ans)), ", \"%s\"", dt);
+                else strcat(ans, ", \"\"");
+                if( triples[this->_to_send[i]].l[0] )
+                    sprintf((char*)((unsigned long)ans + strlen(ans)), ", \"%s\"", triples[this->_to_send[i]].l);
+            }
+            strcat(ans, "]");
+            if( i > 0 ) strcat(answer, ", ");
+            strcat(answer, ans);
+        }
+        strcat(answer, "]}");
+*/
         return answer;
     }
 

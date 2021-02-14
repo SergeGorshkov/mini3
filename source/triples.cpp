@@ -150,9 +150,9 @@ unsigned long *find_matching_triples(char* subject, char* predicate, char* objec
         else if(subject[0] != '*') {
             mini_hash = get_mini_hash_char(subject);
             ind = _find_using_index(s_index, chunks_size, mini_hash, &pos, &chunk);
-            if (ind > 0) {
+            if (ind > -1) {
                 while (ind > 0 && s_index[ ind-1 ].mini_hash == mini_hash) ind--;
-                while (ind < (*n_triples) && s_index[ ind ].mini_hash == mini_hash) {
+                while (ind < (*n_chunks)*CHUNK_SIZE && s_index[ ind ].mini_hash == mini_hash) {
                     if(triples[ s_index[ ind ].index ].status != 0) { ind++; continue; }
                     char *s = get_string(triples[ s_index[ ind ].index ].s_pos);
                     if(strcmp(s, subject) != 0) { ind++; continue; }
@@ -176,9 +176,9 @@ unsigned long *find_matching_triples(char* subject, char* predicate, char* objec
         else if(object[0] != '*') {
             mini_hash = get_mini_hash_char(object);
             ind = _find_using_index(o_index, chunks_size, mini_hash, &pos, &size);
-            if (ind > 0) {
+            if (ind > -1) {
                 while (ind > 0 && o_index[ ind-1 ].mini_hash == mini_hash) ind--;
-                while (ind < (*n_triples) && o_index[ ind ].mini_hash == mini_hash) {
+                while (ind < (*n_chunks)*CHUNK_SIZE && o_index[ ind ].mini_hash == mini_hash) {
                     if(triples[ o_index[ ind ].index ].status != 0) { ind++; continue; }
                     char *o = get_string(triples[ o_index[ ind ].index ].o_pos);
                     if(strcmp(o, object) != 0) { ind++; continue; }
@@ -204,7 +204,7 @@ unsigned long *find_matching_triples(char* subject, char* predicate, char* objec
             ind = _find_using_index(p_index, chunks_size, mini_hash, &pos, &chunk);
             if (ind > 0) {
                 while (ind > 0 && p_index[ ind-1 ].mini_hash == mini_hash) ind--;
-                while (ind < (*n_triples) && p_index[ ind ].mini_hash == mini_hash) {
+                while (ind < (*n_chunks)*CHUNK_SIZE && p_index[ ind ].mini_hash == mini_hash) {
                     if(triples[ p_index[ ind ].index ].status != 0) { ind++; continue; }
                     char *p = get_string(triples[ p_index[ ind ].index ].p_pos);
                     if(strcmp(p, predicate) != 0) continue;

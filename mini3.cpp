@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
 					write(global_web_pip[3], &command, sizeof(int));
 					break;
 			}
-/*
+
 FILE *fp = fopen("triples.log", "a");
 fprintf(fp, "\nDumping %lu triples\n", *n_triples);
 for(int i=0; i<*n_triples; i++) {
@@ -162,7 +162,7 @@ for(unsigned long c=0; c<*n_chunks; c++) {
 		fprintf(fp, "%lx\t%lu\n", full_index[c*CHUNK_SIZE + i].mini_hash, full_index[c*CHUNK_SIZE + i].index);
 }
 fclose(fp);
-*/
+
 		}
 	}
 	#endif
