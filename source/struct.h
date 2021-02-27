@@ -85,6 +85,21 @@ struct prefix {
     int len;
 };
 
+struct chain_variable {
+    char obj[MAX_VALUE_LEN];
+    int var;                    // corresponding variable
+    int dep;                    // dependence score
+
+    int n;                      // number of conditions
+    int cond_p[32];             // reference to other variables (predicate)
+    int cond_o[32];             // reference to other variables (object)
+    
+    int n_cand;                 // number of candidates
+    char **cand;                // id of candidate of this variable's value
+    char **cand_s;              // subject leading to this candidate
+    char **cand_p;              // linkage (predicate or object) leading from subject to this candidate
+};
+
 unsigned long *global_block_ul = NULL;
 prefix *prefixes = NULL;
 triple *triples = NULL;

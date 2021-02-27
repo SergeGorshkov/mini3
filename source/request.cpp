@@ -1,28 +1,27 @@
 
-struct condition {
-    char obj[MAX_VALUE_LEN];
-    int var;                    // corresponding variable
-    int dep;                    // dependence score
-    int n;                      // number of conditions
-    int cond_p[32];             // reference to other variables (predicate)
-    int cond_o[32];             // reference to other variables (object)
-    int n_cand;                 // number of candidates
-    char **cand;                // id of candidate of this variable's value
-    char **cand_s;              // subject leading to this candidate
-    char **cand_l;              // linkage (predicate or object) leading from subject to this candidate
-};
-
 class request {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0, _n_cond = 0, depth = 0;
+    int _n_triples = 0, _n_prefixes = 0;
     local_triple _triples[1024];
     prefix _prefixes[1024];
-    condition _cond[32];
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
     char request_id[1024];
+
+    // Variables set for chain request
+    chain_variable var[32];
+    int n_var = 0, depth = 0;
+
+    // Current combination during combinations building
+    int n_comb;
+    int comb_var[32];
+    char *comb_value[32];
+
+    // Set of candidate combinations
+    char ***pre_comb_value;
+    int n_pcv = 0;
 
     bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int *pip) {
         int r = 0, pos = 0, status = 0;
@@ -212,7 +211,7 @@ public:
             *message = this->return_triples();
             return true;
         }
-        else if(this->_n_triples && this->_n_cond && operation == OP_GET) {
+        else if(this->_n_triples && this->n_var && operation == OP_GET) {
             logger(LOG, "GET triples request", this->request_id, 0);
             *message = this->return_triples_chain();
             return true;
@@ -296,7 +295,7 @@ public:
             *status = -1;
             return message;
         }
-        if(this->_n_cond > 0) {
+        if(this->n_var > 0) {
             message = (char*)malloc(128);
             sprintf(message, "Variables are not allowed in patterns; use Chain parameter");
             *status = -1;
@@ -336,14 +335,14 @@ public:
         if(strncmp(s, "http", 4) == 0 || s[0]=='*') return NULL;
         if(s[0] == '?') {
             bool found = false;
-            for(int i=0; i<this->_n_cond; i++) {
-                if(strcmp(this->_cond[i].obj, s) == 0) {
+            for(int i=0; i<this->n_var; i++) {
+                if(strcmp(this->var[i].obj, s) == 0) {
                     found = true;
                     break;
                 }
             }
-            if(!found && this->_n_cond < 32)
-                strcpy(this->_cond[this->_n_cond++].obj, s);
+            if(!found && this->n_var < 32)
+                strcpy(this->var[this->n_var++].obj, s);
             return NULL;
         }
         for(int i=0; i<*n_prefixes; i++) {
@@ -436,172 +435,6 @@ public:
         return answer;
     }
 
-    int find_cond(char *obj) {
-        for(int j=0; j<this->_n_cond; j++) {
-            if(strcmp(obj, this->_cond[j].obj) == 0)
-                return j;
-        }
-        return -1;
-    }
-
-    int add_cond(char *obj) {
-        strcpy(this->_cond[this->_n_cond].obj, obj);
-        return this->_n_cond++;
-    }
-
-    void propagate_dependent(int i) {
-        this->depth++;
-        if(this->depth > 10) return;
-        this->_cond[i].dep++;
-        for(int j=0; j<this->_cond[i].n; j++) {
-            if(this->_cond[this->_cond[i].cond_p[j]].obj[0] == '?')
-                propagate_dependent(this->_cond[i].cond_p[j]);
-            if(this->_cond[this->_cond[i].cond_o[j]].obj[0] == '?')
-                propagate_dependent(this->_cond[i].cond_o[j]);
-        }
-    }
-
-    void add_candidate(int i, char *s, char *subject, char *linkage) {
-printf("add candidate %s\n", s);
-        bool found = false;
-        for(int j=0; j<this->_cond[i].n_cand; j++) {
-            if(strcmp(this->_cond[i].cand[j], s) == 0) {
-                found = true;
-                break;
-            }
-        }
-        if(found) return;
-        if(!this->_cond[i].cand) {
-            this->_cond[i].cand = (char**)malloc(1024*sizeof(char*));
-            this->_cond[i].cand_s = (char**)malloc(1024*sizeof(char*));
-            this->_cond[i].cand_l = (char**)malloc(1024*sizeof(char*));
-        }
-        else if(this->_cond[i].n_cand % 1024 == 0) {
-            this->_cond[i].cand = (char**)realloc(this->_cond[i].cand, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
-            this->_cond[i].cand_s = (char**)realloc(this->_cond[i].cand_s, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
-            this->_cond[i].cand_l = (char**)realloc(this->_cond[i].cand_l, (this->_cond[i].n_cand % 1024 + 1) * 1024 * sizeof(char*));
-        }
-        this->_cond[i].cand[this->_cond[i].n_cand] = s;
-        this->_cond[i].cand_s[this->_cond[i].n_cand] = subject;
-        this->_cond[i].cand_l[this->_cond[i].n_cand] = linkage;
-        this->_cond[i].n_cand++;
-    }
-
-    void get_candidates(int i, int j, char *subject, char *predicate, char *object) {
-        unsigned long n = 0;
-printf("Find %s - %s - %s\n", subject, predicate, object);
-        unsigned long *res = find_matching_triples(subject, predicate, object, NULL, NULL, &n);
-        for(unsigned long k=0; k<n; k++) {
-            if(subject[0] == '*')
-                add_candidate(i, get_string(triples[res[k]].s_pos), NULL, NULL);
-            if(predicate[0] == '*')
-                add_candidate(this->_cond[i].cond_p[j], get_string(triples[res[k]].p_pos), subject, object);
-            if(object[0] == '*')
-                add_candidate(this->_cond[i].cond_o[j], get_string(triples[res[k]].o_pos), subject, predicate);
-        }
-        free(res);
-    }
-
-    char *return_triples_chain(void) {
-//logger(LOG, "(child) Return triples chain", "", this->_n_send);
-        int order[32], max_dep = 0, n = 0;
-        char star[2] = "*";
-        memset(order, 0, sizeof(int)*32);
-
-        // Заполняем условия
-        for(int i=0; i<this->_n_triples; i++) {
-            int ics = find_cond(this->_triples[i].s);
-            if(ics == -1) ics = add_cond(this->_triples[i].s);
-            int icp = find_cond(this->_triples[i].p);
-            if(icp == -1) icp = add_cond(this->_triples[i].p);
-            int ico = find_cond(this->_triples[i].o);
-            if(ico == -1) ico = add_cond(this->_triples[i].o);
-            this->_cond[ics].cond_p[this->_cond[ics].n] = icp;
-            this->_cond[ics].cond_o[this->_cond[ics].n++] = ico;
-            if(this->_cond[icp].obj[0] == '?') this->_cond[icp].dep++;
-            if(this->_cond[ico].obj[0] == '?') this->_cond[ico].dep++;
-        }
-        // Определяем зависимость переменных, чтобы установить порядок расчета
-        for(int i=0; i<this->_n_cond; i++) {
-            for(int j=0; j<this->_cond[i].n; j++) {
-                if(this->_cond[this->_cond[i].cond_p[j]].obj[0] == '?')
-                    propagate_dependent(this->_cond[i].cond_p[j]);
-                if(this->_cond[this->_cond[i].cond_o[j]].obj[0] == '?')
-                    propagate_dependent(this->_cond[i].cond_o[j]);
-            }
-        }
-        // Ищем наибольшую зависимость
-        for(int i=0; i<this->_n_cond; i++) {
-            if(this->_cond[i].dep > max_dep)
-                max_dep = this->_cond[i].dep;
-        }
-        // Строим массив с порядком обхода условий (определения переменных)
-        for(int i=0; i<=max_dep; i++) {
-            for(int j=0; j<this->_n_cond; j++) {
-                if(this->_cond[j].dep == i)
-                    order[n++] = j;
-            }
-        }
-        // По очереди определяем значения переменных
-        for(int x=0; x<n; x++) {
-            int i = order[x];
-            char *subject = this->_cond[i].obj;
-            // Цикл по условиям на определенный субъект
-            for(int j=0; j<this->_cond[i].n; j++) {
-printf("\n");
-                char *predicate = this->_cond[this->_cond[i].cond_p[j]].obj;
-                char *object = this->_cond[this->_cond[i].cond_o[j]].obj;
-                if(this->_cond[i].obj[0] == '?' && this->_cond[i].n_cand) {
-                    for(int l=0; l<this->_cond[i].n_cand; l++)
-                        get_candidates(i, j, this->_cond[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
-                }
-                else
-                    get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
-            }
-        }
-
-printf("\nConditions:\n");
-for(int x=0; x<n; x++) {
-    int i = order[x];
-    if(this->_cond[i].obj[0] != '?' && this->_cond[i].n == 0)
-        continue;
-    printf("%i:\t%s, dep = %i\n", i, this->_cond[i].obj, this->_cond[i].dep);
-    for(int j=0; j<this->_cond[i].n; j++)
-        printf("\t\t%s => %s\n", this->_cond[this->_cond[i].cond_p[j]].obj, this->_cond[this->_cond[i].cond_o[j]].obj);
-    if(!this->_cond[i].n_cand) continue;
-    printf("\tCandidates:\n");
-    for(int j=0; j<this->_cond[i].n_cand; j++) {
-        printf("\t\t%s", this->_cond[i].cand[j]);
-        if(this->_cond[i].cand_s[j])
-            printf("\t(%s -> %s)", this->_cond[i].cand_s[j], this->_cond[i].cand_l[j]);
-        printf("\n");
-    }
-}
-
-        char *answer = (char*)malloc(1024);
-        sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\"}");
-/*
-        char *answer = (char*)malloc(this->_n_send*1024*10);
-        sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Triples\":[", this->request_id);
-        for(int i=0; i<this->_n_send; i++) {
-            char ans[1024*10];
-            sprintf(ans, "[\"%s\", \"%s\", \"%s\"", get_string(triples[this->_to_send[i]].s_pos), get_string(triples[this->_to_send[i]].p_pos), get_string(triples[this->_to_send[i]].o_pos));
-            if( triples[this->_to_send[i]].d_len || triples[this->_to_send[i]].l[0]) {
-                char *dt = get_string(triples[this->_to_send[i]].d_pos);
-                if(dt) sprintf((char*)((unsigned long)ans + strlen(ans)), ", \"%s\"", dt);
-                else strcat(ans, ", \"\"");
-                if( triples[this->_to_send[i]].l[0] )
-                    sprintf((char*)((unsigned long)ans + strlen(ans)), ", \"%s\"", triples[this->_to_send[i]].l);
-            }
-            strcat(ans, "]");
-            if( i > 0 ) strcat(answer, ", ");
-            strcat(answer, ans);
-        }
-        strcat(answer, "]}");
-*/
-        return answer;
-    }
-
     char *commit_triples(int *pip) {
         if(pip[1] == -1) return NULL;
         char *message = (char*)malloc(1024*10); message[0] = 0;
@@ -675,6 +508,307 @@ for(int x=0; x<n; x++) {
         if(stringtable) munmap(stringtable, *string_allocated);
         if(global_block_ul) munmap(global_block_ul, sizeof(unsigned long)*N_GLOBAL_VARS);
         triples = NULL; full_index = NULL; s_index = NULL; p_index = NULL; o_index = NULL; stringtable = NULL; global_block_ul = NULL;
+        if(this->n_pcv != 0) {
+            for(int i=0; i<this->n_pcv; i++)
+                free(this->pre_comb_value[i]);
+            free(this->pre_comb_value);
+        }
+    }
+
+    // Triples chain request processing functions
+
+    // Find index in the conditions array for the given variable
+    int find_cond(char *obj) {
+        for(int j=0; j<this->n_var; j++) {
+            if(strcmp(obj, this->var[j].obj) == 0)
+                return j;
+        }
+        return -1;
+    }
+
+    // Add condition for the new variable
+    int add_cond(char *obj) {
+        if(this->n_var >= 32) return -1;
+        strcpy(this->var[this->n_var].obj, obj);
+        return this->n_var++;
+    }
+
+    // Recursively propagates variables dependence
+    void propagate_dependent(int i) {
+        this->depth++;
+        if(this->depth > 10) return;
+        this->var[i].dep++;
+        for(int j=0; j<this->var[i].n; j++) {
+            if(this->var[this->var[i].cond_p[j]].obj[0] == '?')
+                propagate_dependent(this->var[i].cond_p[j]);
+            if(this->var[this->var[i].cond_o[j]].obj[0] == '?')
+                propagate_dependent(this->var[i].cond_o[j]);
+        }
+    }
+
+    // Add a new candidate object (value) for some variable
+    void add_candidate(int i, char *s, char *subject, char *linkage) {
+//printf("add candidate %s\n", s);
+        bool found = false;
+        for(int j=0; j<this->var[i].n_cand; j++) {
+            if(strcmp(this->var[i].cand[j], s) == 0 && strcmp(this->var[i].cand_s[j], subject) == 0 && strcmp(this->var[i].cand_p[j], linkage) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if(found) return;
+        if(!this->var[i].cand) {
+            this->var[i].cand = (char**)malloc(1024*sizeof(char*));
+            this->var[i].cand_s = (char**)malloc(1024*sizeof(char*));
+            this->var[i].cand_p = (char**)malloc(1024*sizeof(char*));
+        }
+        else if(this->var[i].n_cand % 1024 == 0) {
+            this->var[i].cand = (char**)realloc(this->var[i].cand, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char*));
+            this->var[i].cand_s = (char**)realloc(this->var[i].cand_s, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char*));
+            this->var[i].cand_p = (char**)realloc(this->var[i].cand_p, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char*));
+        }
+        this->var[i].cand[this->var[i].n_cand] = s;
+        this->var[i].cand_s[this->var[i].n_cand] = subject;
+        this->var[i].cand_p[this->var[i].n_cand] = linkage;
+        this->var[i].n_cand++;
+    }
+
+    // Fill candidate objects (values) array for j-th variable using its linkage from i-th variable
+    void get_candidates(int i, int j, char *subject, char *predicate, char *object) {
+        unsigned long n = 0;
+//printf("Find %s - %s - %s\n", subject, predicate, object);
+        unsigned long *res = find_matching_triples(subject, predicate, object, NULL, NULL, &n);
+        for(unsigned long k=0; k<n; k++) {
+            if(subject[0] == '*')
+                add_candidate(i, get_string(triples[res[k]].s_pos), NULL, NULL);
+            if(predicate[0] == '*')
+                add_candidate(this->var[i].cond_p[j], get_string(triples[res[k]].p_pos), subject, object);
+            if(object[0] == '*')
+                add_candidate(this->var[i].cond_o[j], get_string(triples[res[k]].o_pos), subject, predicate);
+        }
+        free(res);
+    }
+
+    // Recursively build single combination (single row of response)
+    void build_combination(int i, int ref_by_p, char *ref_by_s) {
+//printf("\nEnter build_combination var = %s, ref_by_p = %s, ref_by_s = %s\n", this->var[i].obj, this->var[ref_by_p].obj, ref_by_s);
+        for(int j=0; j<n_comb; j++) {
+            // Error: this variable is already present in the current combination
+            if(comb_var[j] == i)
+                return;
+        }
+        comb_var[n_comb++] = i;
+        // Cycle through all candidate objects
+        for(int j=0; j<this->var[i].n_cand; j++) {
+            if(ref_by_p != -1) {
+                if(strcmp(this->var[ref_by_p].obj, this->var[i].cand_p[j]) != 0)
+                    continue;
+            }
+            if(ref_by_s != NULL) {
+                if(strcmp(ref_by_s, this->var[i].cand_s[j]) != 0)
+                    continue;
+            }
+            comb_value[n_comb-1] = this->var[i].cand[j];
+            // Cycle through all references from this variable to others
+            for(int k=0; k<this->var[i].n; k++) {
+                // Predicate is a variable
+                if(this->var[this->var[i].cond_p[k]].obj[0] == '?') {
+                    continue;
+                }
+                build_combination(this->var[i].cond_o[k], this->var[i].cond_p[k], this->var[i].cand[j]);
+            }
+            if(this->var[i].n == 0) {
+                if(this->n_pcv == 0)
+                    this->pre_comb_value = (char***)malloc(1024*sizeof(char**));
+                else if(this->n_pcv % 1024 == 0)
+                    this->pre_comb_value = (char***)realloc(this->pre_comb_value, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char**));
+                this->pre_comb_value[this->n_pcv] = (char**)malloc(32*sizeof(char*));
+                memset(this->pre_comb_value[this->n_pcv], 0, 32*sizeof(char*));
+                for(int l=0; l<n_comb; l++)
+                    this->pre_comb_value[this->n_pcv][comb_var[l]] = comb_value[l];
+                this->n_pcv++;
+            }
+        }
+        n_comb--;
+    }
+
+    // Entry point for triples chain request
+    char *return_triples_chain(void) {
+//logger(LOG, "(child) Return triples chain", "", this->_n_send);
+        int order[32], max_dep = 0, n = 0;
+        char star[2] = "*";
+        memset(order, 0, sizeof(int)*32);
+
+        // Заполняем условия
+        for(int i=0; i<this->_n_triples; i++) {
+            int ics = find_cond(this->_triples[i].s);
+            if(ics == -1) ics = add_cond(this->_triples[i].s);
+            int icp = find_cond(this->_triples[i].p);
+            if(icp == -1) icp = add_cond(this->_triples[i].p);
+            int ico = find_cond(this->_triples[i].o);
+            if(ico == -1) ico = add_cond(this->_triples[i].o);
+            if(ics == -1 || icp == -1 || ico == -1) continue;
+            this->var[ics].cond_p[this->var[ics].n] = icp;
+            this->var[ics].cond_o[this->var[ics].n++] = ico;
+            if(this->var[icp].obj[0] == '?') this->var[icp].dep++;
+            if(this->var[ico].obj[0] == '?') this->var[ico].dep++;
+        }
+        // Определяем зависимость переменных, чтобы установить порядок расчета
+        for(int i=0; i<this->n_var; i++) {
+            for(int j=0; j<this->var[i].n; j++) {
+                if(this->var[this->var[i].cond_p[j]].obj[0] == '?')
+                    propagate_dependent(this->var[i].cond_p[j]);
+                if(this->var[this->var[i].cond_o[j]].obj[0] == '?')
+                    propagate_dependent(this->var[i].cond_o[j]);
+            }
+        }
+        // Ищем наибольшую зависимость
+        for(int i=0; i<this->n_var; i++) {
+            if(this->var[i].dep > max_dep)
+                max_dep = this->var[i].dep;
+        }
+        // Строим массив с порядком обхода условий (определения переменных)
+        for(int i=0; i<=max_dep; i++) {
+            for(int j=0; j<this->n_var; j++) {
+                if(this->var[j].dep == i)
+                    order[n++] = j;
+            }
+        }
+        // По очереди определяем значения переменных
+        for(int x=0; x<n; x++) {
+            int i = order[x];
+            char *subject = this->var[i].obj;
+            // Цикл по условиям на определенный субъект
+            for(int j=0; j<this->var[i].n; j++) {
+//printf("\n");
+                char *predicate = this->var[this->var[i].cond_p[j]].obj;
+                char *object = this->var[this->var[i].cond_o[j]].obj;
+                if(this->var[i].obj[0] == '?' && this->var[i].n_cand) {
+                    for(int l=0; l<this->var[i].n_cand; l++)
+                        get_candidates(i, j, this->var[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                }
+                else
+                    get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+            }
+        }
+/*
+printf("\nConditions:\n");
+for(int x=0; x<n; x++) {
+    int i = order[x];
+    if(this->var[i].obj[0] != '?' && this->var[i].n == 0)
+        continue;
+    printf("%i:\t%s, dep = %i\n", i, this->var[i].obj, this->var[i].dep);
+    for(int j=0; j<this->var[i].n; j++)
+        printf("\t\t%s => %s\n", this->var[this->var[i].cond_p[j]].obj, this->var[this->var[i].cond_o[j]].obj);
+    if(!this->var[i].n_cand) continue;
+    printf("\tCandidates:\n");
+    for(int j=0; j<this->var[i].n_cand; j++) {
+        printf("\t\t%s", this->var[i].cand[j]);
+        if(this->var[i].cand_s[j])
+            printf("\t(%s -> %s)", this->var[i].cand_s[j], this->var[i].cand_p[j]);
+        printf("\n");
+    }
+}
+*/
+        // Search for the first variable having candidates
+        for(int x=0; x<n; x++) {
+            int i = order[x];
+            if(this->var[i].obj[0] != '?' || this->var[i].n_cand == 0)
+                continue;
+            // Cycle through candidates and build combination starting with each of them
+            n_comb = 0;
+            build_combination(i, -1, NULL);
+            break;
+        }
+
+        // Cycle through incomplete combinations to make complete ones
+        for(int z=0; z<this->n_pcv; z++) {
+            // Cycle through all remaining combinations
+            int npcv = this->n_pcv;
+            for(int x=z+1; x<npcv; x++) {
+                bool compat = true, inequal = false;
+                // Every non-empty element of the compatible remaining combination must be present in the source combination, if the value of the same variable is set in the source combination
+                for(int v=0; v<32; v++) {
+                    if(this->pre_comb_value[z][v] == NULL) {
+                        if(this->pre_comb_value[x][v] != NULL)
+                            inequal = true;
+                        continue;
+                    }
+                    if(this->pre_comb_value[x][v] == NULL) continue;
+                    if(strcmp(this->pre_comb_value[z][v], this->pre_comb_value[x][v]) != 0) {
+                        compat = false;
+                        break;
+                    }
+                }
+                // Sub-combinations are compatible and not equal, let us join them
+                if(compat && inequal) {
+                    if(this->n_pcv == 0)
+                        this->pre_comb_value = (char***)malloc(1024*sizeof(char**));
+                    else if(this->n_pcv % 1024 == 0)
+                        this->pre_comb_value = (char***)realloc(this->pre_comb_value, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char**));
+                    this->pre_comb_value[this->n_pcv] = (char**)malloc(32*sizeof(char*));
+                    memset(this->pre_comb_value[this->n_pcv], 0, 32*sizeof(char*));
+                    for(int v=0; v<32; v++) {
+                        if(this->pre_comb_value[z][v] != NULL) this->pre_comb_value[this->n_pcv][v] = this->pre_comb_value[z][v];
+                        if(this->pre_comb_value[x][v] != NULL) this->pre_comb_value[this->n_pcv][v] = this->pre_comb_value[x][v];
+                    }
+                    this->n_pcv++;
+                }
+            }
+        }
+
+        // Output complete combinations
+printf("Combinations after joining:\n");
+        char vars[1024*32], *result;
+        bool first = true, first_val = true;
+        result = (char*)malloc(1024*3*this->n_pcv);
+        sprintf(vars, "\"Vars\": [");
+        sprintf(result, "\"Result\": [");
+        for(int x=0; x<n; x++) {
+            int i = order[x];
+            if(this->var[i].obj[0] != '?')
+                continue;
+            if(!first) strcat(vars, ", ");
+            first = false;
+printf("%s\t", this->var[i].obj);
+            sprintf((char*)((unsigned long)vars+strlen(vars)), "\"%s\"", this->var[i].obj);
+        }
+        strcat(vars, "] ");
+printf("\n");
+        first = true;
+        for(int z=0; z<this->n_pcv; z++) {
+            bool complete = true;
+            for(int x=0; x<n; x++) {
+                int i = order[x];
+                if(this->var[i].obj[0] != '?')
+                    continue;
+                if(this->pre_comb_value[z][i] == NULL) {
+                    complete = false;
+                    break;
+                }
+            }
+            if(!complete) continue;
+            if(!first) strcat(result, ", ");
+            first_val = true;
+            strcat(result, " [");
+            for(int x=0; x<n; x++) {
+                int i = order[x];
+                if(this->var[i].obj[0] != '?')
+                    continue;
+printf("%s\t", this->pre_comb_value[z][i]);
+                if(!first_val) strcat(result, ", ");
+                first_val = false;
+                sprintf((char*)((unsigned long)result+strlen(result)), "\"%s\"", this->pre_comb_value[z][i]);
+            }
+printf("\n");
+            strcat(result,"]");
+        }
+        strcat(result, "] ");
+
+        char *answer = (char*)malloc(1024+strlen(vars)+strlen(result));
+        sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", %s, %s}", vars, result);
+        free(result);
+        return answer;
     }
 
 };
