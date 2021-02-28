@@ -6,6 +6,9 @@
 
 #define EP_PREFIX 1
 #define EP_TRIPLE 2
+#define EP_CHAIN 3
+
+#define MOD_COUNT 1
 
 #define MAX_JSON_TOKENS 1024
 #define MAX_TAG_LEN 256
@@ -38,6 +41,9 @@
 #define B_PREFIX 3
 #define B_ORDER 4
 #define B_FILTER 5
+
+#define LOGIC_AND 0
+#define LOGIC_OR 1
 
 #define PREFIXES_FILE "prefixes.bin"
 #define STAT_FILE "stat.bin"
@@ -102,6 +108,14 @@ struct order
     char direction[MAX_VALUE_LEN];
 };
 
+struct filter
+{
+    int group;
+    char variable[MAX_VALUE_LEN];
+    char operation[MAX_VALUE_LEN];
+    char value[MAX_VALUE_LEN];
+};
+
 struct chain_variable
 {
     char obj[MAX_VALUE_LEN];
@@ -137,7 +151,7 @@ char database_path[1024];
 char broker[1024], broker_host[1024], broker_port[1024], broker_user[1024], broker_password[1024], broker_queue[1024], broker_output_queue[1024];
 
 void logger(int type, char *s1, char *s2, int socket_fd);
-char *process_request(char *buffer, int operation, int endpoint, int *pip);
+char *process_request(char *buffer, int operation, int endpoint, int modifier, int *pip);
 void save_globals(void);
 long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk);
 unsigned long *find_matching_triples(char *subject, char *predicate, char *object, char *datatype, char *lang, unsigned long *n);

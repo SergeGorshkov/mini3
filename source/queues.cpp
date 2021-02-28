@@ -156,7 +156,7 @@ void listen_queues(void)
             memcpy(req, envelope.message.body.bytes, envelope.message.body.len);
             req[envelope.message.body.len] = 0;
             //logger(LOG, "Queue process\t", "Going to process request\n", 0);
-            char *answer = process_request(req, 0, 0, global_web_pip);
+            char *answer = process_request(req, 0, 0, 0, global_web_pip);
             //logger(LOG, "Queue process\t", "Returned from process request\n", 0);
             amqp_bytes_t message_bytes;
             message_bytes.len = strlen(answer) + 1;
@@ -198,7 +198,7 @@ void listen_queues(void)
                 char *rq = (char *)malloc(rkm->len + 1);
                 memcpy(rq, rkm->payload, rkm->len);
                 rq[rkm->len] = 0;
-                char *answer = process_request(rq, 0, 0, global_web_pip);
+                char *answer = process_request(rq, 0, 0, 0, global_web_pip);
                 size_t len = strlen(answer);
                 rd_kafka_resp_err_t err;
             retry:

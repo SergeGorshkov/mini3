@@ -6,7 +6,7 @@ void web(int fd, int hit, int *pip)
 	long i, ret, len;
 	char *fstr, *answer;
 	static char buffer[BUFSIZE + 1];
-	int operation = 0, endpoint = 0;
+	int operation = 0, endpoint = 0, modifier = 0;
 
 	memset(buffer, 0, BUFSIZE + 1);
 	int pos = 0, content_length = 0, content_start = 0;
@@ -66,6 +66,11 @@ void web(int fd, int hit, int *pip)
 		endpoint = EP_PREFIX;
 	else if (strstr(buffer, "/triple") > 0)
 		endpoint = EP_TRIPLE;
+	else if (strstr(buffer, "/chain") > 0)
+		endpoint = EP_CHAIN;
+	if (strstr(buffer, "/count") > 0) {
+		modifier |= MOD_COUNT;
+	}
 	if (!endpoint)
 		logger(FORBIDDEN, "Endpoint is not specified", buffer, fd);
 
@@ -74,7 +79,7 @@ void web(int fd, int hit, int *pip)
 	if (rp == NULL || strlen(rp) == 0)
 		logger(FORBIDDEN, "No request= parameter is given", buffer, fd);
 	//	logger(LOG,"Param",rp,fd);
-	char *response = process_request(rp, operation, endpoint, pip);
+	char *response = process_request(rp, operation, endpoint, modifier, pip);
 	len = strlen(response);
 	(void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: mini3/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: application/json\n\n", VERSION, len); // Header + a blank line
 																																							//	logger(LOG,"Header",buffer,hit);

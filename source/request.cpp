@@ -3,10 +3,11 @@ class request
 {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0;
+    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, modifier = 0;
     local_triple _triples[1024];
     prefix _prefixes[1024];
     order _orders[32];
+    filter _filters[32];
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
@@ -25,11 +26,12 @@ public:
     char ***pre_comb_value, ***pre_comb_value_type, ***pre_comb_value_lang;
     int n_pcv = 0;
 
-    bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int *pip) {
-        int r = 0, pos = 0, status = 0, array_items = 0, nested_array_items = 0, in_block = 0;
+    bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int modifier, int *pip) {
+        int r = 0, pos = 0, status = 0, nested_array_items[32], current_level = 0, in_block = 0;
         char *t, subject[MAX_VALUE_LEN], predicate[MAX_VALUE_LEN], object[MAX_VALUE_LEN], datatype[MAX_VALUE_LEN], lang[8];
         bool in_method = false, in_id = false;
 
+        memset(nested_array_items, 0, 32*sizeof(int));
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
         //logger(LOG, "Request: ", buffer, 0);
@@ -61,18 +63,16 @@ public:
 //printf("token %s: type: %i, start: %i, end: %i, size: %i, in_block: %i\n",t,tokens[i].type,tokens[i].start,tokens[i].end,tokens[i].size,in_block);
             // This item is a collection or an array
             if(tokens[i].type == 1 || tokens[i].type == 2) {
-                if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN)) {
-                    if(array_items <= 0) {
-                        array_items = tokens[i].size;
-                    }
-                    else {
-                        nested_array_items = tokens[i].size;
-                        array_items--;
-                    }
-                }
-                *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, &pos, &status);
+                *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, current_level, &pos, &status);
                 if (status == -1)
                     goto send_parse_error;
+                if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN || in_block == B_ORDER || in_block == B_FILTER)) {
+                    if(nested_array_items[current_level] > 0)
+                        nested_array_items[++current_level] = tokens[i].size;
+                    else
+                        nested_array_items[current_level] = tokens[i].size;
+//printf("  level = %i, nested items at this level: %i\n", current_level, nested_array_items[current_level]);
+                }
             }
 
             // This item is a string
@@ -92,34 +92,46 @@ public:
                     in_id = true;
                     continue;
                 }
-                if (strcmp(t, "pattern") == 0 || strcmp(t, "chain") == 0 || strcmp(t, "triple") == 0)
+                if (strcmp(t, "pattern") == 0 || strcmp(t, "triple") == 0)
                 {
                     if (!endpoint)
                         endpoint = EP_TRIPLE;
                     if (endpoint != EP_TRIPLE)
-                    {
-                        *message = (char *)malloc(128);
-                        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
-                        this->free_all();
-                        goto send_parse_error;
-                    }
+                        goto wrong_parameter;
                     if (strcmp(t, "pattern") == 0)
                         in_block = B_PATTERN;
-                    else
-                        in_block = B_CHAIN;
+                    continue;
+                }
+                if (strcmp(t, "chain") == 0)
+                {
+                    if (!endpoint)
+                        endpoint = EP_CHAIN;
+                    if (endpoint != EP_CHAIN)
+                        goto wrong_parameter;
+                    in_block = B_CHAIN;
                     continue;
                 }
                 if (strcmp(t, "order") == 0)
                 {
-                    if (endpoint != EP_TRIPLE)
-                    {
-                        *message = (char *)malloc(128);
-                        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
-                        this->free_all();
-                        goto send_parse_error;
-                    }
+                    if (endpoint != EP_TRIPLE && endpoint != EP_CHAIN)
+                        goto wrong_parameter;
                     in_block = B_ORDER;
                     subject[0] = object[0] = 0; pos = 0;
+                    continue;
+                }
+                if (strcmp(t, "filter") == 0)
+                {
+                    if (endpoint != EP_CHAIN)
+                        goto wrong_parameter;
+                    in_block = B_FILTER;
+                    subject[0] = predicate[0] = object[0] = 0; pos = 0;
+                    continue;
+                }
+                if (strcmp(t, "count") == 0)
+                {
+                    if (endpoint != EP_TRIPLE && endpoint != EP_CHAIN)
+                        goto wrong_parameter;
+                    modifier |= MOD_COUNT;
                     continue;
                 }
                 if (strcmp(t, "prefix") == 0)
@@ -127,12 +139,7 @@ public:
                     if (!endpoint)
                         endpoint = EP_PREFIX;
                     if (endpoint != EP_PREFIX)
-                    {
-                        *message = (char *)malloc(128);
-                        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
-                        this->free_all();
-                        goto send_parse_error;
-                    }
+                        goto wrong_parameter;
                     in_block = B_PREFIX;
                     continue;
                 }
@@ -203,20 +210,52 @@ public:
                     }
                     pos++;
                 }
-                if(nested_array_items > 0) {
-                    nested_array_items--;
-                    if(nested_array_items == 0 && array_items == 0) {
-                        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, &pos, &status);
+                else if (in_block == B_FILTER) {
+                    if (tokens[i].end - tokens[i].start > MAX_VALUE_LEN - 1) {
+                        *message = (char *)malloc(128 + tokens[i].end - tokens[i].start);
+                        sprintf(*message, "Token is too long: %s", t);
+                        goto send_parse_error;
+                    }
+                    switch (pos) {
+                    case 0:
+                        strcpy(subject, t);
+                        break;
+                    case 1:
+                        strcpy(predicate, t);
+                        break;
+                    case 2:
+                        strcpy(object, t);
+                        break;
+                    }
+                    pos++;
+                }
+                if(nested_array_items[current_level] > 0) {
+                    bool end_of_block = false;
+                    int prev_level = current_level;
+                    do {
+                        if(nested_array_items[current_level] > 0)
+                            nested_array_items[current_level]--;
+                        if(nested_array_items[current_level] == 0 && current_level > 0) {
+                            end_of_block = true;
+                            current_level--;
+                            if(nested_array_items[current_level] > 0)
+                                nested_array_items[current_level]--;
+                        }
+                    } while(current_level > 0 && nested_array_items[current_level] == 0);
+//printf("  set current_level to %i (%i items at this level)\n", current_level, nested_array_items[current_level]);
+                    if(end_of_block) {
+                        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, prev_level, &pos, &status);
                         if (status == -1)
                             goto send_parse_error;
-                        in_block = 0;
                     }
+                    if(current_level == 0 && nested_array_items[current_level] == 0)
+                        in_block = 0;
                 }
             }
         }
 
         // Write the last block of the array
-        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, &pos, &status);
+        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, current_level, &pos, &status);
         if (status == -1)
             goto send_parse_error;
         free(buffer);
@@ -225,6 +264,7 @@ public:
         t = NULL;
 
         // Finished JSON processing, start performing actions
+        this->modifier = modifier;
         if (this->_n_prefixes && (operation == OP_PUT || operation == OP_POST))
         {
             logger(LOG, "PUT prefix request", this->request_id, 0);
@@ -256,6 +296,10 @@ public:
                 goto send_parse_error;
         }
         return true;
+    wrong_parameter:
+        *message = (char *)malloc(128);
+        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
+        this->free_all();
     send_parse_error:
         if (buffer)
             free(buffer);
@@ -274,7 +318,7 @@ public:
         return false;
     }
 
-    char *save_parsed_item(char *subject, char *predicate, char *object, char *datatype, char *lang, int operation, int in_block, int *pos, int *status) {
+    char *save_parsed_item(char *subject, char *predicate, char *object, char *datatype, char *lang, int operation, int in_block, int current_level, int *pos, int *status) {
         char *message = NULL;
         bool done = false;
         if (in_block == B_PATTERN && subject[0] && operation == OP_PUT) {
@@ -295,6 +339,10 @@ public:
         }
         else if (in_block == B_ORDER && subject[0] && operation == OP_GET) {
             message = this->save_order(subject, object, status);
+            done = true;
+        }
+        else if (in_block == B_FILTER && subject[0] && operation == OP_GET) {
+            message = this->save_filter(subject, predicate, object, status, current_level);
             done = true;
         }
         else if (in_block == B_PREFIX && (subject[0] || object[0])) {
@@ -411,7 +459,7 @@ public:
     char *save_order(char *subject, char *object, int *status)
     {
         char *message;
-        if (this->_n_prefixes >= 1024)
+        if (this->_n_prefixes >= 32)
         {
             message = (char *)malloc(128);
             sprintf(message, "Too many order sequences");
@@ -422,6 +470,34 @@ public:
         strtolower(object);
         strcpy(this->_orders[this->_n_orders].direction, object);
         this->_n_orders++;
+        return NULL;
+    }
+
+    int filter_group_operation = 0;
+
+    char *save_filter(char *subject, char *predicate, char *object, int *status, int current_level)
+    {
+        char *message;
+        if (this->_n_filters >= 32)
+        {
+            message = (char *)malloc(128);
+            sprintf(message, "Too many filter sequences");
+            *status = -1;
+            return message;
+        }
+        // Filters grouping
+        if(subject[0] && !predicate[0] && !object[0]) {
+            /*this->_filter_groups[this->ngroups] = ; TBC
+            strtolower(subject);
+            if(strcmp(subject, "or") == 0)
+                this->filter_group_operation == LOGIC_OR;
+            */
+        }
+        strcpy(this->_filters[this->_n_filters].variable, subject);
+        strtolower(predicate);
+        strcpy(this->_filters[this->_n_filters].operation, predicate);
+        strcpy(this->_filters[this->_n_filters].value, object);
+        this->_n_filters++;
         return NULL;
     }
 
@@ -674,6 +750,10 @@ public:
     char *return_triples(void) {
         //logger(LOG, "(child) Return triples", "", this->_n_send);
         char *answer = (char *)malloc(this->_n_send * 1024 * 10);
+        if(this->modifier & MOD_COUNT) {
+            sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, this->_n_send);
+            return answer;
+        }
         sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Triples\":[", this->request_id);
         // Sort combinations. Coarse, temporary implementation, could be optimized
         for(int j=this->_n_orders-1; j>=0; j--) {
@@ -906,6 +986,10 @@ public:
         char star[2] = "*";
         memset(order, 0, sizeof(int) * 32);
 
+printf("Filters: %i\n", this->_n_filters);
+for(int i=0; i<this->_n_filters; i++) {
+    printf("%i: %s - %s - %s\n", i, this->_filters[i].variable, this->_filters[i].operation, this->_filters[i].value);
+}
         // Fill the conditions
         for (int i = 0; i < this->_n_triples; i++)
         {
@@ -1094,6 +1178,11 @@ for(int x=0; x<n; x++) {
                 z--;
             }
         }
+        if(this->modifier & MOD_COUNT) {
+            char *answer = (char *)malloc(1024);
+            sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, this->n_pcv);
+            return answer;
+        }
         // Sort combinations. Coarse, temporary implementation, could be optimized
         for(int j=this->_n_orders-1; j>=0; j--) {
             if(strcmp(this->_orders[j].direction, "desc") == 0) sort_order = 1;
@@ -1198,7 +1287,7 @@ for(int x=0; x<n; x++) {
 };
 
 // Instantiate Request class, process request and free memory
-char *process_request(char *buffer, int operation, int endpoint, int *pip)
+char *process_request(char *buffer, int operation, int endpoint, int modifier, int *pip)
 {
     request req;
     char *answer = NULL;
@@ -1207,7 +1296,7 @@ char *process_request(char *buffer, int operation, int endpoint, int *pip)
     gettimeofday(&start, NULL);
 #endif
     char *pmessage = NULL;
-    if (!req.parse_request(buffer, &pmessage, 0, operation, endpoint, pip))
+    if (!req.parse_request(buffer, &pmessage, 0, operation, endpoint, modifier, pip))
     {
         req.free_all();
         return pmessage;
