@@ -8,51 +8,59 @@
 #define EP_TRIPLE 2
 
 #define MAX_JSON_TOKENS 1024
-#define MAX_TAG_LEN     256
-#define MAX_VALUE_LEN   1024
-#define BUFSIZE         8096
-#define PIPESIZE        16384
-#define ERROR           42
-#define LOG             44
-#define FORBIDDEN       403
-#define NOTFOUND        404
-#define VERSION         1
-#define STATUS_DELETED  1
+#define MAX_TAG_LEN 256
+#define MAX_VALUE_LEN 1024
+#define BUFSIZE 8096
+#define PIPESIZE 16384
+#define ERROR 42
+#define LOG 44
+#define FORBIDDEN 403
+#define NOTFOUND 404
+#define VERSION 1
+#define STATUS_DELETED 1
 
-#define N_MAX_PREFIX    64
-#define SEGMENT         32768    // число триплетов, по достижении которого происходит переаллокация хранилища триплетов
-#define CHUNK_SIZE      1024     // размер сегмента, по достижении которого происходит разбивка индекса на более мелкие сегменты
-#define MAX_CHUNKS      16384    // максимальное число, по достижении которого разбивка индекса на сегменты прекращается
-#define N_GLOBAL_VARS   7
+#define N_MAX_PREFIX 64
+#define SEGMENT 32768    // The amount of triples after which the storage is reallocated
+#define CHUNK_SIZE 1024  // The segment size after which the index is chunked further
+#define MAX_CHUNKS 16384 // The maximal possible amount of chunks
+#define N_GLOBAL_VARS 7
 
-#define COMMIT_TRIPLE   1
-#define DELETE_TRIPLE   2
+#define COMMIT_TRIPLE 1
+#define DELETE_TRIPLE 2
 
-#define RESULT_ERROR    1
-#define RESULT_OK       2
+#define RESULT_ERROR 1
+#define RESULT_OK 2
 #define RESULT_CHUNKS_REBUILT 4
 #define RESULT_TRIPLES_REALLOCATED 8
 
-#define PREFIXES_FILE   "prefixes.bin"
-#define STAT_FILE       "stat.bin"
-#define CHUNKS_FILE     "chunks.bin"
-#define S_CHUNKS_FILE   "s_chunks.bin"
-#define P_CHUNKS_FILE   "p_chunks.bin"
-#define O_CHUNKS_FILE   "o_chunks.bin"
-#define DATABASE_FILE   "database.bin"
-#define INDEX_FILE      "index.bin"
-#define S_INDEX_FILE    "s_index.bin"
-#define P_INDEX_FILE    "p_index.bin"
-#define O_INDEX_FILE    "o_index.bin"
-#define STRING_FILE     "data.bin"
+#define B_PATTERN 1
+#define B_CHAIN 2
+#define B_PREFIX 3
+#define B_ORDER 4
+#define B_FILTER 5
 
-struct indexable {
+#define PREFIXES_FILE "prefixes.bin"
+#define STAT_FILE "stat.bin"
+#define CHUNKS_FILE "chunks.bin"
+#define S_CHUNKS_FILE "s_chunks.bin"
+#define P_CHUNKS_FILE "p_chunks.bin"
+#define O_CHUNKS_FILE "o_chunks.bin"
+#define DATABASE_FILE "database.bin"
+#define INDEX_FILE "index.bin"
+#define S_INDEX_FILE "s_index.bin"
+#define P_INDEX_FILE "p_index.bin"
+#define O_INDEX_FILE "o_index.bin"
+#define STRING_FILE "data.bin"
+
+struct indexable
+{
     unsigned char hash[SHA_DIGEST_LENGTH];
     unsigned long mini_hash;
     int status;
 };
 
-struct local_triple : indexable {
+struct local_triple : indexable
+{
     struct indexable;
     char s[MAX_VALUE_LEN];
     char p[MAX_VALUE_LEN];
@@ -61,7 +69,8 @@ struct local_triple : indexable {
     char l[8];
 };
 
-struct triple : indexable {
+struct triple : indexable
+{
     struct indexable;
     unsigned long s_pos;
     unsigned long s_len;
@@ -74,30 +83,41 @@ struct triple : indexable {
     char l[8];
 };
 
-struct mini_index {
+struct mini_index
+{
     unsigned long index;
     unsigned long mini_hash;
 };
 
-struct prefix {
+struct prefix
+{
     char shortcut[MAX_VALUE_LEN];
     char value[MAX_VALUE_LEN];
     int len;
 };
 
-struct chain_variable {
-    char obj[MAX_VALUE_LEN];
-    int var;                    // corresponding variable
-    int dep;                    // dependence score
+struct order
+{
+    char variable[MAX_VALUE_LEN];
+    char direction[MAX_VALUE_LEN];
+};
 
-    int n;                      // number of conditions
-    int cond_p[32];             // reference to other variables (predicate)
-    int cond_o[32];             // reference to other variables (object)
-    
-    int n_cand;                 // number of candidates
-    char **cand;                // id of candidate of this variable's value
-    char **cand_s;              // subject leading to this candidate
-    char **cand_p;              // linkage (predicate or object) leading from subject to this candidate
+struct chain_variable
+{
+    char obj[MAX_VALUE_LEN];
+    int var;        // corresponding variable
+    int dep;        // dependence score
+
+    int n;          // number of conditions
+    int cond_p[32]; // reference to other variables (predicate)
+    int cond_o[32]; // reference to other variables (object)
+
+    int n_cand;     // number of candidates
+    char **cand;    // id of candidate of this variable's value
+    char **cand_s;  // subject leading to this candidate
+    char **cand_p;  // linkage (predicate or object) leading from subject to this candidate
+    char **cand_d;  // value's datatype
+    char **cand_l;  // value's lang
 };
 
 unsigned long *global_block_ul = NULL;
@@ -111,6 +131,7 @@ int chunk_bits = 0;
 char *stringtable = NULL;
 sem_t *sem, *wsem, *rsem, *lsem, *psem;
 int global_web_pip[4];
+int sort_order = 0;
 
 char database_path[1024];
 char broker[1024], broker_host[1024], broker_port[1024], broker_user[1024], broker_password[1024], broker_queue[1024], broker_output_queue[1024];
@@ -119,68 +140,73 @@ void logger(int type, char *s1, char *s2, int socket_fd);
 char *process_request(char *buffer, int operation, int endpoint, int *pip);
 void save_globals(void);
 long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk);
-unsigned long *find_matching_triples(char* subject, char* predicate, char* object, char *datatype, char * lang, unsigned long *n);
+unsigned long *find_matching_triples(char *subject, char *predicate, char *object, char *datatype, char *lang, unsigned long *n);
 bool write_to_pipe(int pip, int command, local_triple *t);
 void read_from_pipe(int pip, local_triple *t);
 char *get_string(unsigned long pos);
 unsigned long add_string(char *s, unsigned long n);
 
-void *mmap_file(int mode, char *file, size_t size) {
+void *mmap_file(int mode, char *file, size_t size)
+{
     char fname[1024];
     int fd, mapmode = (mode == O_RDWR ? PROT_READ | PROT_WRITE : PROT_READ);
-    if(size == 0) size = 1024;
+    if (size == 0)
+        size = 1024;
     strcpy(fname, database_path);
     strcat(fname, file);
-    // Увеличиваем размер файла до нужного
-    fd = open(fname, O_RDWR | O_CREAT); chmod(fname, 0666); ftruncate(fd, size); close (fd);
+    // Increase file size as required
+    fd = open(fname, O_RDWR | O_CREAT);
+    chmod(fname, 0666);
+    ftruncate(fd, size);
+    close(fd);
     fd = open(fname, mode);
-    if(!fd)
+    if (!fd)
         logger(ERROR, "cannot open file", file, errno);
     void *block = mmap((caddr_t)0, size, mapmode, MAP_SHARED, fd, 0);
     close(fd);
-    if(block == MAP_FAILED)
+    if (block == MAP_FAILED)
         logger(ERROR, "mmap failed", file, errno);
     return block;
 }
 
-void init_globals(int mode) {
+void init_globals(int mode)
+{
     sem_wait(sem);
-    if(!global_block_ul)
-        global_block_ul = (unsigned long*)mmap_file(O_RDWR, STAT_FILE, sizeof(unsigned long)*N_GLOBAL_VARS);
-    if(!chunks_size) {
-        chunks_size = (unsigned long*)mmap_file(mode, CHUNKS_FILE, sizeof(unsigned long)*MAX_CHUNKS);
-        s_chunks_size = (unsigned long*)mmap_file(mode, S_CHUNKS_FILE, sizeof(unsigned long)*MAX_CHUNKS);
-        p_chunks_size = (unsigned long*)mmap_file(mode, P_CHUNKS_FILE, sizeof(unsigned long)*MAX_CHUNKS);
-        o_chunks_size = (unsigned long*)mmap_file(mode, O_CHUNKS_FILE, sizeof(unsigned long)*MAX_CHUNKS);
+    if (!global_block_ul)
+        global_block_ul = (unsigned long *)mmap_file(O_RDWR, STAT_FILE, sizeof(unsigned long) * N_GLOBAL_VARS);
+    if (!chunks_size)
+    {
+        chunks_size = (unsigned long *)mmap_file(mode, CHUNKS_FILE, sizeof(unsigned long) * MAX_CHUNKS);
+        s_chunks_size = (unsigned long *)mmap_file(mode, S_CHUNKS_FILE, sizeof(unsigned long) * MAX_CHUNKS);
+        p_chunks_size = (unsigned long *)mmap_file(mode, P_CHUNKS_FILE, sizeof(unsigned long) * MAX_CHUNKS);
+        o_chunks_size = (unsigned long *)mmap_file(mode, O_CHUNKS_FILE, sizeof(unsigned long) * MAX_CHUNKS);
     }
-    n_triples = (unsigned long*)global_block_ul;
-    n_prefixes = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long));
-    db_version = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long)*2);
-    allocated = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long)*3);
-    string_allocated = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long)*4);
-    string_length = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long)*5);
-    n_chunks = (unsigned long*)((unsigned long)global_block_ul+sizeof(unsigned long)*6);
-    if( *n_chunks == 0 )
+    n_triples = (unsigned long *)global_block_ul;
+    n_prefixes = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long));
+    db_version = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2);
+    allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 3);
+    string_allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 4);
+    string_length = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 5);
+    n_chunks = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 6);
+    if (*n_chunks == 0)
         *n_chunks = 4;
-    chunk_bits = log2( *n_chunks );
+    chunk_bits = log2(*n_chunks);
 
-    if(*allocated == 0)
+    if (*allocated == 0)
         (*allocated) = SEGMENT;
-    if(!prefixes)
-        prefixes = (prefix*)mmap_file(O_RDWR, PREFIXES_FILE, N_MAX_PREFIX*sizeof(prefix));
-    if(!triples)
-        triples = (triple*)mmap_file(mode, DATABASE_FILE, (*allocated)*sizeof(triple));
-    if(!full_index)
-        full_index = (mini_index*)mmap_file(mode, INDEX_FILE, (*n_chunks)*CHUNK_SIZE*sizeof(mini_index));
-    if(!s_index)
-        s_index = (mini_index*)mmap_file(mode, S_INDEX_FILE, (*n_chunks)*CHUNK_SIZE*sizeof(mini_index));
-    if(!p_index)
-        p_index = (mini_index*)mmap_file(mode, P_INDEX_FILE, (*n_chunks)*CHUNK_SIZE*sizeof(mini_index));
-    if(!o_index)
-        o_index = (mini_index*)mmap_file(mode, O_INDEX_FILE, (*n_chunks)*CHUNK_SIZE*sizeof(mini_index));
-    if(!stringtable)
-        stringtable = (char*)mmap_file(mode, STRING_FILE, (*string_allocated));
+    if (!prefixes)
+        prefixes = (prefix *)mmap_file(O_RDWR, PREFIXES_FILE, N_MAX_PREFIX * sizeof(prefix));
+    if (!triples)
+        triples = (triple *)mmap_file(mode, DATABASE_FILE, (*allocated) * sizeof(triple));
+    if (!full_index)
+        full_index = (mini_index *)mmap_file(mode, INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+    if (!s_index)
+        s_index = (mini_index *)mmap_file(mode, S_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+    if (!p_index)
+        p_index = (mini_index *)mmap_file(mode, P_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+    if (!o_index)
+        o_index = (mini_index *)mmap_file(mode, O_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+    if (!stringtable)
+        stringtable = (char *)mmap_file(mode, STRING_FILE, (*string_allocated));
     sem_post(sem);
 }
-
-
