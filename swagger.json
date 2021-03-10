@@ -1,0 +1,727 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "mini3 triple store",
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/prefix": {
+      "get": {
+	"tags": ["Prefix"],
+	"summary": "Retrieves all the prefixes defined in database",
+        "responses": {
+          "200": {
+            "description": "Successfully returned list of prefixes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArrayOfPrefixes"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Permanently adds prefix(es) to database",
+	"tags": ["Prefix"],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of pairs prefix - fullURI. Use empty key to define default prefix.",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfPrefixes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully added prefixes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryOKResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request or operation has failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes prefix(es) from database",
+	"tags": ["Prefix"],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of pairs prefix - fullURI. Use empty key to define default prefix.",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfPrefixes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully deleted prefixes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryOKResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request or operation has failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/triple": {
+      "get": {
+        "summary": "Get the triples matching given conditions",
+	"tags": [ "Triple" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of patterns (see ArrayOfPatterns schema).",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfPatterns"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved triples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArrayOfTriples"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Add the triples to database",
+	"tags": [ "Triple" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of triples (see ArrayOfTriples schema).",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfTriples"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully added triples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryOKResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request or database write failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete triples from database. Triples elements may be given explicitly or using * wildcards.",
+	"tags": [ "Triple" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of patterns (see ArrayOfPatterns schema).",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfPatterns"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully deleted triples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryOKResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request or database write failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateQueryErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/triple/count": {
+      "get": {
+        "summary": "Get number triples matching given conditions",
+	"tags": [ "Triple" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of patterns (see ArrayOfPatterns schema).",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfPatterns"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved number of triples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberOfElements"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chain": {
+      "get": {
+        "summary": "Get the solutions of the given triples chain pattern",
+	"tags": [ "Chain" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of patterns (see ArrayOfChains schema).",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfChains"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved solutions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArrayOfSolutions"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chain/count": {
+      "get": {
+        "summary": "Get the solutions count of the given triples chain pattern",
+	"tags": [ "Chain" ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "description": "Request body in the form of array of patterns (see ArrayOfChains schema).",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "$ref": "#/components/schemas/ArrayOfChains"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved number of solutions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberOfElements"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UpdateQueryErrorResponse": {
+        "required": [
+          "Status"
+        ],
+        "type": "object",
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "Request id passed in the request",
+            "example": "123456"
+          },
+          "Status": {
+            "type": "string",
+            "description": "Update operation execution result",
+            "example": "Error",
+            "enum": [
+              "OK",
+              "Error"
+            ]
+          },
+          "Message": {
+            "type": "string",
+            "description": "A textual description of an error",
+            "example": "Invalid parameter"
+          }
+        }
+      },
+      "UpdateQueryOKResponse": {
+        "required": [
+          "Status"
+        ],
+        "type": "object",
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "Request id passed in the request",
+            "example": "123456"
+          },
+          "Status": {
+            "type": "string",
+            "description": "Update operation execution result",
+            "example": "OK",
+            "enum": [
+              "OK",
+              "Error"
+            ]
+          }
+        }
+      },
+      "ArrayOfPrefixes": {
+        "type": "object",
+        "required": [
+          "Pattern"
+        ],
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "A request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Pattern": {
+            "type": "array",
+            "description": "Array of prefix - full URI pairs",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+          "Prefix": [
+            {
+              "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+            },
+            {
+              "owl": "http://www.w3.org/2002/07/owl#"
+            }
+          ]
+        }
+      },
+      "ArrayOfPatterns": {
+        "type": "object",
+        "required": [
+          "Pattern"
+        ],
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "A request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Pattern": {
+            "type": "array",
+            "description": "Array of triple patterns. The first element of each pattern is a Subject, the second one is Predicate, the third is an Object, and the fourth is a Lang (optional; make sense only of an Object is a literal). The Subject, Predicate and Object may be given as a full URI, short (prefixed) URI, or * wildcard",
+            "items": {
+              "type": "array",
+              "minItems": "3",
+              "maxItems": "4",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "Order": {
+            "type": "array",
+            "description": "Array of order sequences (optional). The first item of each element is one of [ subject, predicate, object ], the second item is the sort order: asc or desc.",
+            "items": {
+              "type": "array",
+              "minItems": "2",
+              "maxItems": "2",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+          "Pattern": [
+            [
+              "http://localhost/JohnDoe",
+              "rdf:type",
+              "*"
+            ],
+            [
+              "http://localhost/JohnDoe",
+              "rdfs:label",
+              "*"
+            ]
+          ],
+	  "Order": [
+	    [
+	      "predicate", "asc"
+	    ],
+	    [
+	      "object", "desc"
+	    ]
+	  ]
+        }
+      },
+      "ArrayOfTriples": {
+        "type": "object",
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "The request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Triple": {
+            "type": "array",
+            "description": "The first element of each collection is a Subject, the second one is Predicate, the third is an Object, the fourth is a Datatype (XSD datatype, either as the full URI or in the shurctut form), and the fifth is Lang (ISO code of a language). Datatype and Lang are optional; they make sense only of an Object is a literal. The Subject, Predicate and Object may be given as a full URI, short (prefixed) URI",
+            "items": {
+              "type": "array",
+              "minItems": "3",
+              "maxItems": "5",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+          "Triple": [
+            [
+              "http://localhost/JohnDoe",
+              "rdf:type",
+              "foaf:Person"
+            ],
+            [
+              "http://localhost/JohnDoe",
+              "rdfs:label",
+              "John Doe",
+              "xsd:string",
+              "EN"
+            ]
+          ]
+        }
+      },
+      "ArrayOfChains": {
+        "type": "object",
+        "required": [
+          "Chain"
+        ],
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "A request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Pattern": {
+            "type": "array",
+            "description": "Array of triples chain elements. The first element of each pattern is a Subject, the second one is Predicate, the third is an Object. Each element may be a full URI, short (prefixed) URI, or a ?variable. The chain construction has generally the same sense as the SPARQL SELECT pattern.",
+            "items": {
+              "type": "array",
+              "minItems": "3",
+              "maxItems": "3",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "Filter": {
+            "type": "array",
+            "description": "Array of filters. The first element is the logic operation (and, or), each subsequent element is the array representing a nested group of filters or a filter condition.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, more, less, moreorequal, lessorequal), the third is another ?variable or constant.",
+                "minItems": "3",
+                "maxItems": "3",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "Order": {
+            "type": "array",
+            "description": "Array of result sorting sequences (optional). The first item of each element is a ?variable, the second item is the sort order: asc or desc.",
+            "items": {
+              "type": "array",
+              "minItems": "2",
+              "maxItems": "2",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+          "Chain": [
+            [
+              "http://localhost/JohnDoe",
+              "foaf:knows",
+              "?person"
+            ],
+            [
+              "?person",
+              "rdfs:label",
+              "?name"
+            ]
+          ],
+          "Filter": [
+	    "and",
+            [
+              "?personname",
+              "notequal",
+              "Alice Doe"
+            ],
+	    [
+	      "or",
+              [
+                "?personname",
+                "contains",
+                "Alice"
+              ],
+              [
+                "?personname",
+                "contains",
+                "Bob"
+              ]
+	    ]
+          ],
+	  "Order": [
+	    [
+	      "?person", "asc"
+	    ],
+	    [
+	      "?name", "desc"
+	    ]
+	  ]
+        }
+      },
+      "ArrayOfSolutions": {
+        "type": "object",
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "The request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Triple": {
+            "type": "array",
+            "description": "Each array element is a solution",
+            "items": {
+              "type": "array",
+              "description": "Each array element is a value of the corresponding ?variable",
+              "items": {
+                "type": "array",
+                "description": "The first element is the value of the variable, the second is datatype, the third is a language (second and third parameters are empty for non-literal values)",
+                "items": {
+                  "minItems": "3",
+                  "maxItems": "3",
+                  "type": "string"
+                 }
+              }
+            }
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+	  "Vars": [
+	    [
+	      "?person",
+	      "?name",
+	    ]
+	  ],
+          "Result": [
+            [
+              [
+		"http://localhost/JaneDoe",
+		"",
+		""
+	      ],
+              [
+		"Jane Doe",
+		"xsd:string",
+		"EN"
+	      ]
+            ],
+            [
+              [
+		"http://localhost/JohnDoe",
+		"",
+		""
+	      ],
+              [
+		"John Doe",
+		"xsd:string",
+		"EN"
+	      ]
+            ]
+          ]
+        }
+      },
+      "NumberOfElements": {
+        "type": "object",
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "The request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Count": {
+            "type": "integer",
+            "description": "The number of triples or solutions"
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+	  "Count": "10"
+        }
+      },
+      "InvalidResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
