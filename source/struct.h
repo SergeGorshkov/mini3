@@ -45,6 +45,15 @@
 #define LOGIC_AND 0
 #define LOGIC_OR 1
 
+#define COMPARE_EQUAL 1
+#define COMPARE_NOTEQUAL 2
+#define COMPARE_CONTAINS 3
+#define COMPARE_NOTCONTAINS 4
+#define COMPARE_MORE 5
+#define COMPARE_MOREOREQUAL 6
+#define COMPARE_LESS 7
+#define COMPARE_LESSOREQUAL 8
+
 #define PREFIXES_FILE "prefixes.bin"
 #define STAT_FILE "stat.bin"
 #define CHUNKS_FILE "chunks.bin"
@@ -112,8 +121,14 @@ struct filter
 {
     int group;
     char variable[MAX_VALUE_LEN];
-    char operation[MAX_VALUE_LEN];
+    int operation;
     char value[MAX_VALUE_LEN];
+};
+
+struct filter_group
+{
+    int group;
+    int logic;
 };
 
 struct chain_variable

@@ -3,11 +3,12 @@ class request
 {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, modifier = 0;
+    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, _n_filter_groups = 0, modifier = 0, current_filter_group[32];
     local_triple _triples[1024];
     prefix _prefixes[1024];
     order _orders[32];
     filter _filters[32];
+    filter_group _filter_groups[32];
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
@@ -32,6 +33,7 @@ public:
         bool in_method = false, in_id = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
+        memset(this->current_filter_group, 0, 32*sizeof(int));
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
         //logger(LOG, "Request: ", buffer, 0);
@@ -78,7 +80,7 @@ public:
             // This item is a string
             if (tokens[i].type == 3 ) // && t[0] != '{') // Uncommenting this will disallow nested JSON in triples
             {
-                if (in_block != B_PATTERN && in_block != B_CHAIN && in_block != B_PREFIX && in_block != B_ORDER)
+                if (in_block != B_PATTERN && in_block != B_CHAIN && in_block != B_PREFIX && in_block != B_ORDER && in_block != B_FILTER)
                     strtolower(t);
                 else
                     descreen(t);
@@ -473,8 +475,6 @@ public:
         return NULL;
     }
 
-    int filter_group_operation = 0;
-
     char *save_filter(char *subject, char *predicate, char *object, int *status, int current_level)
     {
         char *message;
@@ -485,18 +485,36 @@ public:
             *status = -1;
             return message;
         }
+//printf("%i %s - %s - %s\n", current_level, subject, predicate, object);
         // Filters grouping
         if(subject[0] && !predicate[0] && !object[0]) {
-            /*this->_filter_groups[this->ngroups] = ; TBC
             strtolower(subject);
-            if(strcmp(subject, "or") == 0)
-                this->filter_group_operation == LOGIC_OR;
-            */
+            this->_filter_groups[this->_n_filter_groups].logic = ((strcmp(subject, "or") == 0) ? LOGIC_OR : LOGIC_AND);
+            this->_filter_groups[this->_n_filter_groups].group = (current_level > 0 ? this->current_filter_group[current_level - 1] : -1);
+            this->current_filter_group[current_level] = this->_n_filter_groups;
+            this->_n_filter_groups++;
+            return NULL;
         }
         strcpy(this->_filters[this->_n_filters].variable, subject);
         strtolower(predicate);
-        strcpy(this->_filters[this->_n_filters].operation, predicate);
+        if(strcmp(predicate, "contains") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_CONTAINS;
+        else if(strcmp(predicate, "notcontains") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_NOTCONTAINS;
+        else if(strcmp(predicate, "equal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_EQUAL;
+        else if(strcmp(predicate, "notequal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_NOTEQUAL;
+        else if(strcmp(predicate, "more") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_MORE;
+        else if(strcmp(predicate, "less") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_LESS;
+        else if(strcmp(predicate, "moreorequal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_MOREOREQUAL;
+        else if(strcmp(predicate, "lessorequal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_LESSOREQUAL;
         strcpy(this->_filters[this->_n_filters].value, object);
+        this->_filters[this->_n_filters].group = (current_level > 0 ? this->current_filter_group[current_level - 1] : -1);
         this->_n_filters++;
         return NULL;
     }
@@ -985,11 +1003,6 @@ public:
         int order[32], max_dep = 0, n = 0;
         char star[2] = "*";
         memset(order, 0, sizeof(int) * 32);
-
-printf("Filters: %i\n", this->_n_filters);
-for(int i=0; i<this->_n_filters; i++) {
-    printf("%i: %s - %s - %s\n", i, this->_filters[i].variable, this->_filters[i].operation, this->_filters[i].value);
-}
         // Fill the conditions
         for (int i = 0; i < this->_n_triples; i++)
         {
@@ -1057,7 +1070,7 @@ for(int i=0; i<this->_n_filters; i++) {
             }
         }
 /*        
-printf("\nConditions:\n");
+printf("\Variables:\n");
 for(int x=0; x<n; x++) {
     int i = order[x];
     if(this->var[i].obj[0] != '?' && this->var[i].n == 0)
@@ -1073,6 +1086,16 @@ for(int x=0; x<n; x++) {
             printf("\t(%s -> %s)", this->var[i].cand_s[j], this->var[i].cand_p[j]);
         printf("\n");
     }
+}
+
+printf("Filter groups: %i\n", this->_n_filter_groups);
+for(int i=0; i<this->_n_filter_groups; i++) {
+    printf("%i: %i, %i\n", i, this->_filter_groups[i].group, this->_filter_groups[i].logic);
+}
+
+printf("Filters: %i\n", this->_n_filters);
+for(int i=0; i<this->_n_filters; i++) {
+    printf("%i (%i): %s - %i - %s\n", i, this->_filters[i].group, this->_filters[i].variable, this->_filters[i].operation, this->_filters[i].value);
 }
 */
         // Search for the first variable having candidates
@@ -1146,6 +1169,176 @@ for(int x=0; x<n; x++) {
                     }
                     this->n_pcv++;
                 }
+            }
+        }
+
+        // Apply filters
+        for (int z = 0; z < this->n_pcv; z++) {
+            bool filter_match[32], incomplete = false, fixed_lvalue = false, fixed_rvalue = false;
+            int group_match[32], res;
+            memset(filter_match, 0, 32*sizeof(bool)); memset(group_match, 0, 32*sizeof(int));
+            // First, let us check each individual filter
+            for(int i=0; i<this->_n_filters; i++) {
+                char *lvalue = NULL, *rvalue = NULL;
+                if(this->_filters[i].variable[0] == '?') {
+                    for (int x = 0; x < n; x++) {
+                        if (strcmp(this->var[x].obj, this->_filters[i].variable) == 0) {
+                            lvalue = this->pre_comb_value[z][x];
+                            break;
+                        }
+                    }
+                }
+                else {
+                    lvalue = this->_filters[i].variable;
+                    fixed_lvalue = true;
+                }
+                if(this->_filters[i].value[0] == '?') {
+                    for (int x = 0; x < n; x++) {
+                        if (strcmp(this->var[x].obj, this->_filters[i].value) == 0) {
+                            rvalue = this->pre_comb_value[z][x];
+                            break;
+                        }
+                    }
+                }
+                else {
+                    rvalue = this->_filters[i].value;
+                    fixed_rvalue = true;
+                }
+//printf("filter %i, lvalue: %s, rvalue: %s\n", i, lvalue, rvalue);
+                if(!lvalue || !rvalue) {
+                    incomplete = true;
+                    break;
+                }
+                bool result = false;
+                switch(this->_filters[i].operation) {
+                    case COMPARE_CONTAINS:
+                        if(strstr(lvalue, rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_NOTCONTAINS:
+                        if(!strstr(lvalue, rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_EQUAL:
+                    case COMPARE_NOTEQUAL:
+                        res = strcmp(lvalue, rvalue);
+                        if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
+                            result = true;
+                        if(fixed_lvalue) {
+                            char *tmp = (char*)malloc(1024+strlen(lvalue));
+                            strcpy(tmp, lvalue);
+                            this->resolve_prefix(tmp);
+                            res = strcmp(tmp, rvalue);
+                            if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
+                                result = true;
+                            free(tmp);
+                        }
+                        if(fixed_rvalue) {
+                            char *tmp = (char*)malloc(1024+strlen(rvalue));
+                            strcpy(tmp, rvalue);
+                            this->resolve_prefix(tmp);
+                            res = strcmp(lvalue, tmp);
+                            if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
+                                result = true;
+                            free(tmp);
+                        }
+                        break;
+                    case COMPARE_MORE:
+                        if(atof(lvalue) > atof(rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_MOREOREQUAL:
+                        if(atof(lvalue) >= atof(rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_LESS:
+                        if(atof(lvalue) < atof(rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_LESSOREQUAL:
+                        if(atof(lvalue) <= atof(rvalue))
+                            result = true;
+                        break;
+                }
+            filter_match[i] = result;
+//printf("Result of filter %i: %s\n", i, (result?"true":"false"));
+            }
+            // Now let us check filters combinations
+            if(!incomplete && this->_n_filter_groups > 0) {
+                bool resolved;
+                int iterations = 1;
+                do {
+//printf("Iteration %i\n", iterations);
+                    resolved = true;
+                    for(int i=0; i<this->_n_filter_groups; i++) {
+                        if(group_match[i] != 0) continue;
+                        // Check ordinary filters included in this group
+                        bool one_match = false, one_not_match = false, has_filters = false;
+                        for(int j=0; j<this->_n_filters; j++) {
+                            if(this->_filters[j].group == i) {
+                                if(filter_match[j]) one_match = true;
+                                else one_not_match = true;
+                                has_filters = true;
+                            }
+                        }
+                        if(has_filters) {
+                            if(this->_filter_groups[i].logic == LOGIC_OR) {
+                                if(one_match)
+                                    group_match[i] = 1;
+                                else
+                                    group_match[i] = 2;
+                            }
+                            else if(this->_filter_groups[i].logic == LOGIC_AND) {
+                                if(one_not_match)
+                                    group_match[i] = 2;
+                                else if(one_match)
+                                    group_match[i] = 1;
+                            }
+                        }
+                        // Check nested filter groups
+                        bool has_member_groups = false, has_undefined_member = false;
+                        one_match = one_not_match = false;
+                        for(int k=0; k<this->_n_filter_groups; k++) {
+                            if(this->_filter_groups[k].group == i) {
+                                if(group_match[k] == 1) one_match = true;
+                                else if(group_match[k] == 2) one_not_match = true;
+                                else has_undefined_member = true;
+                                has_member_groups = true;
+                            }
+                        }
+                        if(has_member_groups) {
+                            if(has_undefined_member) group_match[i] = 0;
+                            else if(this->_filter_groups[i].logic == LOGIC_OR) {
+                                if(one_match || group_match[i] == 1)
+                                    group_match[i] = 1;
+                                else
+                                    group_match[i] = 2;
+                            }
+                            else if(this->_filter_groups[i].logic == LOGIC_AND) {
+                                if(one_not_match)
+                                    group_match[i] = 2;
+                                else if(one_match || group_match[i] == 1)
+                                    group_match[i] = 1;
+                            }
+                        }
+                        if(group_match[i] == 0) resolved = false;
+//printf("  group %i: %i (has member groups: %i, has_undefined_member: %i)\n", i, group_match[i], has_member_groups, has_undefined_member);
+                    }
+                    iterations++;
+                } while( !resolved && iterations < 32 );
+                if(iterations == 32) {
+                    char *answer = (char *)malloc(1024);
+                    sprintf(answer, "{\"Status\":\"Error\", \"Message\":\"Cannot resolve filters\"}", this->request_id);
+                    return answer;
+                }
+                resolved = true;
+                for(int i=0; i<this->_n_filter_groups; i++) {
+                    if(this->_filter_groups[i].group == -1 && group_match[i] == 2)
+                        resolved = false;
+                }
+                // Combination have not passed, make it incompleteto throw out on the next step
+                if(!resolved)
+                    this->pre_comb_value[z][0] = NULL;
             }
         }
 
@@ -1238,6 +1431,7 @@ for(int x=0; x<n; x++) {
             free(new_pre_comb_value); free(new_pre_comb_value_type); free(new_pre_comb_value_lang);
             free(unique); free(orders);
         }
+
         // Response output
         sprintf(vars, "\"Vars\": [");
         sprintf(result, "\"Result\": [");

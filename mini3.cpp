@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 				write(global_web_pip[3], &command, sizeof(int));
 				break;
 			case DELETE_TRIPLE:
-				//logger(LOG, "DELETE_TRIPLE command", "", 0);
+				logger(LOG, "DELETE_TRIPLE command", "", 0);
 				sem_wait(rsem);
 				read(global_web_pip[0], &ind, sizeof(unsigned long));
 				sem_post(rsem);
@@ -170,9 +170,9 @@ for(int i=0; i<*n_triples; i++) {
 }
 fprintf(fp, "\nDumping %lu index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
-	fprintf(fp, "Chunk %lu, %lu items\n", c, chunks_size[c]);
-	for(int i=0; i<chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\n", full_index[c*CHUNK_SIZE + i].mini_hash, full_index[c*CHUNK_SIZE + i].index);
+	fprintf(fp, "Chunk %lu, %lu items\n", c, o_chunks_size[c]);
+	for(int i=0; i<o_chunks_size[c]; i++)
+		fprintf(fp, "%lx\t%lu\n", o_index[c*CHUNK_SIZE + i].mini_hash, o_index[c*CHUNK_SIZE + i].index);
 }
 fclose(fp);
 */

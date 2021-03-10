@@ -249,6 +249,7 @@ unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chu
     f_chunks_size[target_chunk]++;
     index[pos].index = *n_triples;
     index[pos].mini_hash = mini_hash;
+//printf("pos = %lu, chunk = %i, %i triples in chunk\n", pos, target_chunk, f_chunks_size[target_chunk]);
     return target_chunk;
 }
 

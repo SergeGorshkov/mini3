@@ -202,7 +202,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     else if (subject[0] != '*')
     {
         mini_hash = get_mini_hash_char(subject);
-        ind = _find_using_index(s_index, chunks_size, mini_hash, &pos, &chunk);
+        ind = _find_using_index(s_index, s_chunks_size, mini_hash, &pos, &chunk);
         if (ind > -1)
         {
             while (ind > 0 && s_index[ind - 1].mini_hash == mini_hash)
@@ -247,7 +247,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     else if (object[0] != '*')
     {
         mini_hash = get_mini_hash_char(object);
-        ind = _find_using_index(o_index, chunks_size, mini_hash, &pos, &size);
+        ind = _find_using_index(o_index, o_chunks_size, mini_hash, &pos, &size);
         if (ind > -1)
         {
             while (ind > 0 && o_index[ind - 1].mini_hash == mini_hash)
@@ -292,7 +292,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     else if (predicate[0] != '*')
     {
         mini_hash = get_mini_hash_char(predicate);
-        ind = _find_using_index(p_index, chunks_size, mini_hash, &pos, &chunk);
+        ind = _find_using_index(p_index, p_chunks_size, mini_hash, &pos, &chunk);
         if (ind > 0)
         {
             while (ind > 0 && p_index[ind - 1].mini_hash == mini_hash)
