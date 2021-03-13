@@ -10,9 +10,9 @@
 
 #define MOD_COUNT 1
 
-#define MAX_JSON_TOKENS 1024
+#define MAX_JSON_TOKENS 16384
 #define MAX_TAG_LEN 256
-#define MAX_VALUE_LEN 1024
+#define MAX_VALUE_LEN 1024 // do not increase
 #define BUFSIZE 8096
 #define PIPESIZE 16384
 #define ERROR 42
@@ -77,10 +77,10 @@ struct indexable
 struct local_triple : indexable
 {
     struct indexable;
-    char s[MAX_VALUE_LEN];
-    char p[MAX_VALUE_LEN];
+    char *s;
+    char *p;
     char *o;
-    char d[256];
+    char *d;
     char l[8];
 };
 
@@ -174,6 +174,8 @@ bool write_to_pipe(int pip, int command, local_triple *t);
 void read_from_pipe(int pip, local_triple *t);
 char *get_string(unsigned long pos);
 unsigned long add_string(char *s, unsigned long n);
+void out_of_memory(void);
+void out_of_memory(int fd);
 
 void *mmap_file(int mode, char *file, size_t size)
 {

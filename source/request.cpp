@@ -29,27 +29,24 @@ public:
 
     bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int modifier, int *pip) {
         int r = 0, pos = 0, status = 0, nested_array_items[32], current_level = 0, in_block = 0;
-        char *t, subject[MAX_VALUE_LEN], predicate[MAX_VALUE_LEN], object[MAX_VALUE_LEN], datatype[MAX_VALUE_LEN], lang[8];
+        char *t, *subject = NULL, *predicate = NULL, *object = NULL, *datatype = NULL, lang[8];
         bool in_method = false, in_id = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
         memset(this->current_filter_group, 0, 32*sizeof(int));
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
-        //logger(LOG, "Request: ", buffer, 0);
         t = (char *)malloc(strlen(buffer) + 1);
+        if(!t) out_of_memory(fd);
         t[0] = 0;
         this->type[0] = 0;
         this->request_id[0] = 0;
-        subject[0] = 0;
-        predicate[0] = 0;
-        object[0] = 0;
-        datatype[0] = 0;
         lang[0] = 0;
 
         // JSON
         if (buffer[0] != '{') {
             *message = (char *)malloc(128);
+            if(!message) out_of_memory(fd);
             strcpy(*message, "Unknown request format (expecting: JSON)");
             this->free_all();
             goto send_parse_error;
@@ -58,14 +55,21 @@ public:
         jsmntok_t tokens[MAX_JSON_TOKENS];
         jsmn_init(&parser);
         r = jsmn_parse(&parser, buffer, strlen(buffer), tokens, MAX_JSON_TOKENS);
-        //printf("%i tokens\n",r);
+        if(r <= 0) {
+            *message = (char *)malloc(128);
+            if(!message) out_of_memory(fd);
+            strcpy(*message, "Cannot parse JSON");
+            this->free_all();
+            goto send_parse_error;
+        }
+//printf("%i tokens\n",r);
         for (int i = 0; i < r; i++) {
             strncpy(t, (char *)((long)buffer + tokens[i].start), tokens[i].end - tokens[i].start);
             t[tokens[i].end - tokens[i].start] = 0;
 //printf("token %s: type: %i, start: %i, end: %i, size: %i, in_block: %i\n",t,tokens[i].type,tokens[i].start,tokens[i].end,tokens[i].size,in_block);
             // This item is a collection or an array
             if(tokens[i].type == 1 || tokens[i].type == 2) {
-                *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, current_level, &pos, &status);
+                *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, current_level, &pos, &status);
                 if (status == -1)
                     goto send_parse_error;
                 if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN || in_block == B_ORDER || in_block == B_FILTER)) {
@@ -75,6 +79,7 @@ public:
                         nested_array_items[current_level] = tokens[i].size;
 //printf("  level = %i, nested items at this level: %i\n", current_level, nested_array_items[current_level]);
                 }
+                pos = 0;
             }
 
             // This item is a string
@@ -118,7 +123,9 @@ public:
                     if (endpoint != EP_TRIPLE && endpoint != EP_CHAIN)
                         goto wrong_parameter;
                     in_block = B_ORDER;
-                    subject[0] = object[0] = 0; pos = 0;
+                    if(subject) { free(subject); subject = NULL; }
+                    if(object) { free(object); object = NULL; }
+                    pos = 0;
                     continue;
                 }
                 if (strcmp(t, "filter") == 0)
@@ -126,7 +133,10 @@ public:
                     if (endpoint != EP_CHAIN)
                         goto wrong_parameter;
                     in_block = B_FILTER;
-                    subject[0] = predicate[0] = object[0] = 0; pos = 0;
+                    if(subject) { free(subject); subject = NULL; }
+                    if(predicate) { free(predicate); predicate = NULL; }
+                    if(object) { free(object); object = NULL; }
+                    pos = 0;
                     continue;
                 }
                 if (strcmp(t, "count") == 0)
@@ -163,70 +173,49 @@ public:
                     if (!operation)
                     {
                         *message = (char *)malloc(128 + strlen(t));
+                        if(!message) out_of_memory(fd);
                         sprintf(*message, "Unknown method: %s", t);
                         goto send_parse_error;
                     }
                     strcpy(this->type, t);
                     in_method = false;
                 }
-                else if (in_block == B_PATTERN || in_block == B_CHAIN)
+                else if (in_block == B_PATTERN || in_block == B_CHAIN || in_block == B_FILTER || in_block == B_PREFIX || in_block == B_ORDER)
                 {
-                    if (tokens[i].end - tokens[i].start > MAX_VALUE_LEN - 1) {
+                    if (tokens[i].end - tokens[i].start > 65535) {
                         *message = (char *)malloc(128 + tokens[i].end - tokens[i].start);
+                        if(!message) out_of_memory(fd);
                         sprintf(*message, "Token is too long: %s", t);
                         goto send_parse_error;
                     }
                     switch (pos) {
                     case 0:
+                        if(subject) free(subject);
+                        subject = (char*)malloc(strlen(t)+1);
+                        if(!subject) out_of_memory();
                         strcpy(subject, t);
                         break;
                     case 1:
+                        if(predicate) free(predicate);
+                        predicate = (char*)malloc(strlen(t)+1);
+                        if(!predicate) out_of_memory();
                         strcpy(predicate, t);
                         break;
                     case 2:
+                        if(object) free(object);
+                        object = (char*)malloc(strlen(t)+1);
+                        if(!object) out_of_memory();
                         strcpy(object, t);
                         break;
                     case 3:
+                        if(datatype) free(datatype);
+                        datatype = (char*)malloc(strlen(t)+1);
+                        if(!datatype) out_of_memory();
                         strcpy(datatype, t);
                         break;
                     case 4:
                         if (strlen(t) < 7)
                             strcpy(lang, t);
-                        break;
-                    }
-                    pos++;
-                }
-                else if (in_block == B_PREFIX || in_block == B_ORDER) {
-                    if (tokens[i].end - tokens[i].start > MAX_VALUE_LEN - 1) {
-                        *message = (char *)malloc(128 + tokens[i].end - tokens[i].start);
-                        sprintf(*message, "Token is too long: %s", t);
-                        goto send_parse_error;
-                    }
-                    switch (pos) {
-                    case 0:
-                        strcpy(subject, t);
-                        break;
-                    case 1:
-                        strcpy(object, t);
-                        break;
-                    }
-                    pos++;
-                }
-                else if (in_block == B_FILTER) {
-                    if (tokens[i].end - tokens[i].start > MAX_VALUE_LEN - 1) {
-                        *message = (char *)malloc(128 + tokens[i].end - tokens[i].start);
-                        sprintf(*message, "Token is too long: %s", t);
-                        goto send_parse_error;
-                    }
-                    switch (pos) {
-                    case 0:
-                        strcpy(subject, t);
-                        break;
-                    case 1:
-                        strcpy(predicate, t);
-                        break;
-                    case 2:
-                        strcpy(object, t);
                         break;
                     }
                     pos++;
@@ -246,7 +235,7 @@ public:
                     } while(current_level > 0 && nested_array_items[current_level] == 0);
 //printf("  set current_level to %i (%i items at this level)\n", current_level, nested_array_items[current_level]);
                     if(end_of_block) {
-                        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, prev_level, &pos, &status);
+                        *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, prev_level, &pos, &status);
                         if (status == -1)
                             goto send_parse_error;
                     }
@@ -257,41 +246,57 @@ public:
         }
 
         // Write the last block of the array
-        *message = this->save_parsed_item(subject, predicate, object, datatype, lang, operation, in_block, current_level, &pos, &status);
+        *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, current_level, &pos, &status);
         if (status == -1)
             goto send_parse_error;
         free(buffer);
+        if(subject) free(subject);
+        if(predicate) free(predicate);
+        if(object) free(object);
+        if(datatype) free(datatype);
         buffer = NULL;
         free(t);
         t = NULL;
 
         // Finished JSON processing, start performing actions
         this->modifier = modifier;
-        if (this->_n_prefixes && (operation == OP_PUT || operation == OP_POST))
+        if (endpoint == EP_PREFIX && this->_n_prefixes && (operation == OP_PUT || operation == OP_POST))
         {
             logger(LOG, "PUT prefix request", this->request_id, 0);
             if (*message = this->commit_prefixes())
                 goto send_parse_error;
         }
-        else if (this->_n_triples && operation == OP_PUT)
+        else if (endpoint == EP_PREFIX && operation == OP_GET)
+        {
+            logger(LOG, "GET prefix request", this->request_id, 0);
+            *message = this->return_prefixes();
+            return true;
+        }
+        else if (endpoint == EP_PREFIX && operation == OP_DELETE)
+        {
+            logger(LOG, "DELETE prefix request", this->request_id, 0);
+            if (*message = this->delete_prefixes())
+                goto send_parse_error;
+        }
+        else if (endpoint == EP_TRIPLE && this->_n_triples && operation == OP_PUT)
         {
             logger(LOG, "PUT triples request", this->request_id, 0);
             if (*message = this->commit_triples(pip))
                 goto send_parse_error;
         }
-        else if (this->_n_send && operation == OP_GET)
+        else if (endpoint == EP_TRIPLE && this->_n_send && operation == OP_GET)
         {
             logger(LOG, "GET triples request", this->request_id, 0);
             *message = this->return_triples();
             return true;
         }
-        else if (this->_n_triples && this->n_var && operation == OP_GET)
+        else if (endpoint == EP_CHAIN && this->_n_triples && this->n_var && operation == OP_GET)
         {
             logger(LOG, "GET triples request", this->request_id, 0);
             *message = this->return_triples_chain(this->request_id);
             return true;
         }
-        else if (this->_n_delete && operation == OP_DELETE)
+        else if (endpoint == EP_TRIPLE && this->_n_delete && operation == OP_DELETE)
         {
             logger(LOG, "DELETE triples request", this->request_id, 0);
             if (*message = this->commit_delete(pip))
@@ -300,6 +305,7 @@ public:
         return true;
     wrong_parameter:
         *message = (char *)malloc(128);
+        if(!message) out_of_memory(fd);
         sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
         this->free_all();
     send_parse_error:
@@ -310,9 +316,11 @@ public:
         if (!*message)
         {
             *message = (char *)malloc(128);
+            if(!message) out_of_memory(fd);
             strcpy(*message, "Parsing error");
         }
         char *inv = (char *)malloc(256 + strlen(*message));
+        if(!inv) out_of_memory(fd);
         sprintf(inv, "{\"Status\":\"Error\", \"RequestId\":\"%s\", \"Message\":\"%s\"}", this->request_id, *message);
         if (*message)
             free(*message);
@@ -320,47 +328,50 @@ public:
         return false;
     }
 
-    char *save_parsed_item(char *subject, char *predicate, char *object, char *datatype, char *lang, int operation, int in_block, int current_level, int *pos, int *status) {
+    char *save_parsed_item(char **subject, char **predicate, char **object, char **datatype, char *lang, int operation, int in_block, int current_level, int *pos, int *status) {
+        if(subject == NULL || *subject == NULL) return NULL;
+//printf("Save parsed item %s - %s\n", *subject, *predicate);
         char *message = NULL;
         bool done = false;
-        if (in_block == B_PATTERN && subject[0] && operation == OP_PUT) {
+        if (in_block == B_PATTERN && *subject[0] && operation == OP_PUT) {
             message = this->make_triple(subject, predicate, object, datatype, lang, status);
             done = true;
         }
-        else if (in_block == B_PATTERN && subject[0] && operation == OP_DELETE) {
+        else if (in_block == B_PATTERN && *subject[0] && operation == OP_DELETE) {
             message = this->delete_triple(subject, predicate, object, datatype, lang, status);
             done = true;
         }
-        else if (in_block == B_PATTERN && subject[0] && operation == OP_GET) {
+        else if (in_block == B_PATTERN && *subject[0] && operation == OP_GET) {
             message = this->get_triple(subject, predicate, object, datatype, lang, status);
             done = true;
         }
-        else if (in_block == B_CHAIN && subject[0] && operation == OP_GET) {
+        else if (in_block == B_CHAIN && *subject[0] && operation == OP_GET) {
             message = this->make_triple(subject, predicate, object, datatype, lang, status);
             done = true;
         }
-        else if (in_block == B_ORDER && subject[0] && operation == OP_GET) {
-            message = this->save_order(subject, object, status);
+        else if (in_block == B_ORDER && *subject[0] && operation == OP_GET) {
+            message = this->save_order(*subject, *predicate, status);
             done = true;
         }
-        else if (in_block == B_FILTER && subject[0] && operation == OP_GET) {
-            message = this->save_filter(subject, predicate, object, status, current_level);
+        else if (in_block == B_FILTER && *subject[0] && operation == OP_GET) {
+            message = this->save_filter(*subject, *predicate, *object, status, current_level);
             done = true;
         }
-        else if (in_block == B_PREFIX && (subject[0] || object[0])) {
-            message = this->make_prefix(subject, object, status);
+        else if (in_block == B_PREFIX && (*subject[0] || *predicate[0])) {
+            message = this->make_prefix(*subject, *predicate, status);
             done = true;
         }
-        if(done) {
-            *pos = 0;
-            subject[0] = predicate[0] = object[0] = datatype[0] = lang[0] = 0;
-        }
+        if(*subject) { free(*subject); *subject = NULL; }
+        if(*predicate) { free(*predicate); *predicate = NULL; }
+        if(*object) { free(*object); *object = NULL; }
+        if(*datatype) { free(*datatype); *datatype = NULL; }
         return message;
     }
 
-    char *make_triple(char *subject, char *predicate, char *object, char *datatype, char *lang, int *status)
+    char *make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status)
     {
         char *message;
+//printf("Resolve %s - %s - %s\n", *subject, *predicate, *object);
         if (resolve_prefixes_in_triple(subject, predicate, object, datatype, &message) == -1) {
             *status = -1;
             return message;
@@ -368,26 +379,47 @@ public:
         if (this->_n_triples >= 1024)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many triples or patterns");
             *status = -1;
             return message;
         }
         memset(&this->_triples[this->_n_triples], 0, sizeof(triple));
-        strcpy(this->_triples[this->_n_triples].s, subject);
-        strcpy(this->_triples[this->_n_triples].p, predicate);
-        this->_triples[this->_n_triples].o = (char *)malloc(strlen(object) + 1);
-        strcpy(this->_triples[this->_n_triples].o, object);
-        strcpy(this->_triples[this->_n_triples].d, datatype);
+        this->_triples[this->_n_triples].s = (char *)malloc(strlen(*subject) + 1);
+        if(!this->_triples[this->_n_triples].s) out_of_memory();
+        strcpy(this->_triples[this->_n_triples].s, *subject);
+        this->_triples[this->_n_triples].p = (char *)malloc(strlen(*predicate) + 1);
+        if(!this->_triples[this->_n_triples].p) out_of_memory();
+        strcpy(this->_triples[this->_n_triples].p, *predicate);
+        this->_triples[this->_n_triples].o = (char *)malloc(strlen(*object) + 1);
+        if(!this->_triples[this->_n_triples].o) out_of_memory();
+        strcpy(this->_triples[this->_n_triples].o, *object);
+        int datatype_len = 0;
+        if(datatype != NULL) {
+            if(*datatype != NULL) {
+                if(*datatype[0] != 0) {
+                    this->_triples[this->_n_triples].d = (char *)malloc(strlen(*datatype) + 1);
+                    if(!this->_triples[this->_n_triples].d) out_of_memory();
+                    strcpy(this->_triples[this->_n_triples].d, *datatype);
+                    datatype_len = strlen(*datatype);
+                }
+            }
+        }
+        if(!datatype_len) this->_triples[this->_n_triples].d = NULL;
         strcpy(this->_triples[this->_n_triples].l, lang);
-        char data[MAX_VALUE_LEN * 5 + 128];
-        sprintf(data, "%s | %s | %s | %s | %s", subject, predicate, object, datatype, lang);
+        char *data = (char*)malloc(strlen(*subject) + strlen(*predicate) + strlen(*object) + datatype_len + 128);
+        if(!data) out_of_memory();
+        sprintf(data, "%s | %s | %s | %s", *subject, *predicate, *object, lang);
+        if(datatype_len)
+            strcat(data, *datatype);
         SHA1((unsigned char *)data, strlen(data), this->_triples[this->_n_triples].hash);
+        free(data);
         this->_triples[this->_n_triples].mini_hash = get_mini_hash(this->_triples[this->_n_triples].hash);
         this->_n_triples++;
         return NULL;
     }
 
-    char *delete_triple(char *subject, char *predicate, char *object, char *datatype, char *lang, int *status)
+    char *delete_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status)
     {
         char *message;
         if (resolve_prefixes_in_triple(subject, predicate, object, datatype, &message) == -1) {
@@ -397,19 +429,21 @@ public:
         if (this->_n_triples >= 1024)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many triples or patterns");
             *status = -1;
             return message;
         }
         memset(&this->_triples[this->_n_triples], 0, sizeof(triple));
         unsigned long n = 0;
-        unsigned long *res = find_matching_triples(subject, predicate, object, datatype, lang, &n);
+        unsigned long *res = find_matching_triples(*subject, *predicate, *object, (datatype ? *datatype : NULL), lang, &n);
         if (n > 0)
         {
             if (this->_to_delete)
                 this->_to_delete = (unsigned long *)realloc(this->_to_delete, sizeof(unsigned long) * (this->_n_delete + n));
             else
                 this->_to_delete = (unsigned long *)malloc(sizeof(unsigned long) * (this->_n_delete + n));
+            if(!this->_to_delete) out_of_memory();
             for (unsigned long i = 0; i < n; i++)
                 this->_to_delete[this->_n_delete + i] = res[i];
             this->_n_delete += n;
@@ -418,7 +452,7 @@ public:
         return NULL;
     }
 
-    char *get_triple(char *subject, char *predicate, char *object, char *datatype, char *lang, int *status)
+    char *get_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status)
     {
         char *message;
         if (resolve_prefixes_in_triple(subject, predicate, object, datatype, &message) == -1)
@@ -429,6 +463,7 @@ public:
         if (this->_n_triples >= 1024)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many triples or patterns");
             *status = -1;
             return message;
@@ -436,19 +471,21 @@ public:
         if (this->n_var > 0)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Variables are not allowed in patterns; use Chain parameter");
             *status = -1;
             return message;
         }
-        memset(&this->_triples[this->_n_triples], 0, sizeof(triple));
+        memset(&this->_triples[this->_n_triples], 0, sizeof(local_triple));
         unsigned long n = 0;
-        unsigned long *res = find_matching_triples(subject, predicate, object, datatype, lang, &n);
+        unsigned long *res = find_matching_triples(*subject, *predicate, *object, (datatype ? *datatype : NULL), lang, &n);
         if (n > 0)
         {
             if (this->_to_send)
                 this->_to_send = (unsigned long *)realloc(this->_to_send, sizeof(unsigned long) * (this->_n_send + n));
             else
                 this->_to_send = (unsigned long *)malloc(sizeof(unsigned long) * (this->_n_send + n));
+            if(!this->_to_send) out_of_memory();
             for (unsigned long i = 0; i < n; i++)
                 this->_to_send[this->_n_send + i] = res[i];
             this->_n_send += n;
@@ -464,6 +501,7 @@ public:
         if (this->_n_prefixes >= 32)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many order sequences");
             *status = -1;
             return message;
@@ -481,13 +519,14 @@ public:
         if (this->_n_filters >= 32)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many filter sequences");
             *status = -1;
             return message;
         }
 //printf("%i %s - %s - %s\n", current_level, subject, predicate, object);
         // Filters grouping
-        if(subject[0] && !predicate[0] && !object[0]) {
+        if(subject[0] && predicate == NULL && object == NULL) {
             strtolower(subject);
             this->_filter_groups[this->_n_filter_groups].logic = ((strcmp(subject, "or") == 0) ? LOGIC_OR : LOGIC_AND);
             this->_filter_groups[this->_n_filter_groups].group = (current_level > 0 ? this->current_filter_group[current_level - 1] : -1);
@@ -525,6 +564,7 @@ public:
         if (this->_n_prefixes >= 1024)
         {
             message = (char *)malloc(128);
+            if(!message) out_of_memory();
             sprintf(message, "Too many prefixes");
             *status = -1;
             return message;
@@ -536,73 +576,82 @@ public:
         return NULL;
     }
 
-    char *resolve_prefix(char *s)
+    char *resolve_prefix(char **s)
     {
-        char st[MAX_VALUE_LEN];
-        if (strncmp(s, "http", 4) == 0 || s[0] == '*')
+        if (strncmp(*s, "http", 4) == 0 || *s[0] == '*')
             return NULL;
-        if (s[0] == '?')
+        if (*s[0] == '?')
         {
             bool found = false;
             for (int i = 0; i < this->n_var; i++)
             {
-                if (strcmp(this->var[i].obj, s) == 0)
+                if (strcmp(this->var[i].obj, *s) == 0)
                 {
                     found = true;
                     break;
                 }
             }
             if (!found && this->n_var < 32)
-                strcpy(this->var[this->n_var++].obj, s);
+                strcpy(this->var[this->n_var++].obj, *s);
             return NULL;
         }
         for (int i = 0; i < *n_prefixes; i++)
         {
-            if (strncmp(s, prefixes[i].shortcut, prefixes[i].len) == 0 && s[prefixes[i].len] == ':')
+            if (strncmp(*s, prefixes[i].shortcut, prefixes[i].len) == 0 && ((char)*(char*)((unsigned long)*s + prefixes[i].len) == ':'))
             {
-                if (strlen(prefixes[i].value) + strlen(s) + 1 > MAX_VALUE_LEN)
-                {
-                    char *message = (char *)malloc(128 + strlen(s));
-                    sprintf(message, "Cannot resolve prefix, URI is too long", s);
-                    return message;
-                }
+                char *st = (char*)malloc(strlen(*s) + strlen(prefixes[i].value) + 1);
+                if(!st) out_of_memory();
                 strcpy(st, prefixes[i].value);
-                strcpy(st + strlen(st), (char *)((long)s + prefixes[i].len + 1));
-                strcpy(s, st);
+                strcat(st, (char *)((unsigned long)(*s) + prefixes[i].len + 1));
+                *s = (char*)realloc(*s, strlen(st) + 1);
+                if(!*s) out_of_memory();
+                strcpy(*s, st);
+                free(st);
                 return NULL;
             }
         }
+        // Default prefix
         for (int i = 0; i < *n_prefixes; i++)
         {
             if (prefixes[i].shortcut[0] != 0)
                 continue;
+            char *st = (char*)malloc(strlen(*s) + strlen(prefixes[i].value) + 1024);
+            if(!st) out_of_memory();
             strcpy(st, prefixes[i].value);
-            strcpy(st + strlen(st), s);
-            strcpy(s, st);
+            strcat(st, *s);
+            *s = (char*)realloc(*s, strlen(st) + 1024);
+            if(!*s) out_of_memory();
+            strcpy(*s, st);
+            free(st);
+            break;
         }
         return NULL;
     }
 
-    int resolve_prefixes_in_triple(char *subject, char *predicate, char *object, char *datatype, char **message)
+    int resolve_prefixes_in_triple(char **subject, char **predicate, char **object, char **datatype, char **message)
     {
-        if (subject[0])
+        if (*subject[0])
         {
             if (*message = this->resolve_prefix(subject))
                 return -1;
         }
-        if (predicate[0])
+        if (*predicate[0])
         {
             if (*message = this->resolve_prefix(predicate))
                 return -1;
         }
-        if (datatype[0] == 0)
-        {
-            if (*message = this->resolve_prefix(object))
-                return -1;
+        // If the object is not a literal
+        bool is_literal = false;
+        if(datatype != NULL) {
+            if(*datatype != NULL) {
+                if (*message = this->resolve_prefix(datatype))
+                    return -1;
+                if (*datatype[0] != 0)
+                    is_literal = true;
+            }
         }
-        else
-        {
-            if (*message = this->resolve_prefix(datatype))
+        if(!is_literal) {
+            if (*message = this->resolve_prefix(object))
                 return -1;
         }
         return 0;
@@ -640,16 +689,57 @@ public:
         return NULL;
     }
 
+    char *return_prefixes(void)
+    {
+        char *result = (char*)malloc((*n_prefixes)*1600);
+        if(!result) out_of_memory();
+        sprintf(result, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Prefixes\": [", this->request_id);
+        //logger(LOG, "Get prefixes", "", this->_n_prefixes);
+        for (int j = 0; j < (*n_prefixes); j++)
+        {
+            if(j>0) strcat(result, ", ");
+            sprintf((char*)((unsigned long)result+strlen(result)), "{\"%s\": \"%s\"}", prefixes[j].shortcut, prefixes[j].value);
+        }
+        strcat(result,"]}");
+        return result;
+    }
+
+    char *delete_prefixes(void)
+    {
+        //logger(LOG, "Delete prefixes", "", this->_n_prefixes);
+        sem_wait(psem);
+        for (int i = 0; i < this->_n_prefixes; i++)
+        {
+            bool found = false;
+            for (int j = 0; j < (*n_prefixes); j++)
+            {
+                if (strcmp(prefixes[j].shortcut, this->_prefixes[i].shortcut) == 0)
+                {
+                    if((*n_prefixes) - 1 > j)
+                        memmove(&prefixes[j], &prefixes[j+1], sizeof(prefix)*((*n_prefixes)-j-1));
+                    memset(&prefixes[(*n_prefixes)-1], 0, sizeof(prefix));
+                    (*n_prefixes)--;
+                }
+            }
+        }
+        sem_post(psem);
+        save_globals();
+        //logger(LOG, "Prefixes deleted", "", *n_prefixes);
+        return NULL;
+    }
+
     char *commit_triples(int *pip)
     {
         if (pip[1] == -1)
             return NULL;
         char *message = (char *)malloc(1024 * 10);
+        if(!message) out_of_memory();
         message[0] = 0;
         sem_wait(wsem);
         //logger(LOG, "(child) Commit triples", "", this->_n_triples);
         for (int i = 0; i < this->_n_triples; i++)
         {
+//logger(LOG, "Commit triple", "", i);
             // Send to the parent process for commit
             int command = COMMIT_TRIPLE;
             if (!write_to_pipe(pip[1], command, &this->_triples[i]))
@@ -681,6 +771,7 @@ public:
         if (pip[1] == -1)
             return NULL;
         char *message = (char *)malloc(1024 * 10);
+        if(!message) out_of_memory();
         message[0] = 0;
         int command = DELETE_TRIPLE;
         sem_wait(wsem);
@@ -689,6 +780,7 @@ public:
             if (!write(pip[1], &command, sizeof(int)))
             {
                 char *message = (char *)malloc(128);
+                if(!message) out_of_memory();
                 strcpy(message, "Error writing to pipe");
                 sem_post(wsem);
                 return message;
@@ -696,6 +788,7 @@ public:
             if (!write(pip[1], &this->_to_delete[i], sizeof(unsigned long)))
             {
                 char *message = (char *)malloc(128);
+                if(!message) out_of_memory();
                 strcpy(message, "Error writing to pipe");
                 sem_post(wsem);
                 return message;
@@ -718,8 +811,10 @@ public:
     {
         for (int i = 0; i < this->_n_triples; i++)
         {
-            if (this->_triples[i].o)
-                free(this->_triples[i].o);
+            if (this->_triples[i].s) free(this->_triples[i].s);
+            if (this->_triples[i].p) free(this->_triples[i].p);
+            if (this->_triples[i].o) free(this->_triples[i].o);
+            if (this->_triples[i].d) free(this->_triples[i].d);
         }
         if (prefixes)
             munmap(prefixes, N_MAX_PREFIX * sizeof(prefix));
@@ -768,6 +863,7 @@ public:
     char *return_triples(void) {
         //logger(LOG, "(child) Return triples", "", this->_n_send);
         char *answer = (char *)malloc(this->_n_send * 1024 * 10);
+        if(!answer) out_of_memory();
         if(this->modifier & MOD_COUNT) {
             sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, this->_n_send);
             return answer;
@@ -778,7 +874,9 @@ public:
             if(strcmp(this->_orders[j].direction, "desc") == 0) sort_order = 1;
             else sort_order = 0;
             char **unique = (char**)malloc(this->_n_send*sizeof(char*));
+            if(!unique) out_of_memory();
             unsigned long *orders = (unsigned long*)malloc(this->_n_send*sizeof(unsigned long));
+            if(!orders) out_of_memory();
             int sort_var_index = 0;
             if(strcmp(this->_orders[j].variable, "predicate") == 0) sort_var_index = 1;
             else if(strcmp(this->_orders[j].variable, "object") == 0) sort_var_index = 2;
@@ -894,6 +992,7 @@ public:
             this->var[i].cand_p = (char **)malloc(1024 * sizeof(char *));
             this->var[i].cand_d = (char **)malloc(1024 * sizeof(char *));
             this->var[i].cand_l = (char **)malloc(1024 * sizeof(char *));
+            if(!this->var[i].cand || !this->var[i].cand_s || !this->var[i].cand_p || !this->var[i].cand_d || !this->var[i].cand_l) out_of_memory();
         }
         else if (this->var[i].n_cand % 1024 == 0)
         {
@@ -902,6 +1001,7 @@ public:
             this->var[i].cand_p = (char **)realloc(this->var[i].cand_p, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char *));
             this->var[i].cand_d = (char **)realloc(this->var[i].cand, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char *));
             this->var[i].cand_l = (char **)realloc(this->var[i].cand, (this->var[i].n_cand / 1024 + 1) * 1024 * sizeof(char *));
+            if(!this->var[i].cand || !this->var[i].cand_s || !this->var[i].cand_p || !this->var[i].cand_d || !this->var[i].cand_l) out_of_memory();
         }
         this->var[i].cand[this->var[i].n_cand] = s;
         this->var[i].cand_s[this->var[i].n_cand] = subject;
@@ -972,17 +1072,22 @@ public:
                     this->pre_comb_value = (char ***)malloc(1024 * sizeof(char **));
                     this->pre_comb_value_type = (char ***)malloc(1024 * sizeof(char **));
                     this->pre_comb_value_lang = (char ***)malloc(1024 * sizeof(char **));
+                    if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
                 }
                 else if (this->n_pcv % 1024 == 0) {
                     this->pre_comb_value = (char ***)realloc(this->pre_comb_value, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
                     this->pre_comb_value_type = (char ***)realloc(this->pre_comb_value_type, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
                     this->pre_comb_value_lang = (char ***)realloc(this->pre_comb_value_lang, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
+                    if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
                 }
                 this->pre_comb_value[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                if(!this->pre_comb_value[this->n_pcv]) out_of_memory();
                 memset(this->pre_comb_value[this->n_pcv], 0, 32 * sizeof(char *));
                 this->pre_comb_value_type[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                if(!this->pre_comb_value_type[this->n_pcv]) out_of_memory();
                 memset(this->pre_comb_value_type[this->n_pcv], 0, 32 * sizeof(char *));
                 this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                if(!this->pre_comb_value_lang[this->n_pcv]) out_of_memory();
                 memset(this->pre_comb_value_lang[this->n_pcv], 0, 32 * sizeof(char *));
                 for (int l = 0; l < n_comb; l++) {
                     this->pre_comb_value[this->n_pcv][comb_var[l]] = comb_value[l];
@@ -1004,9 +1109,11 @@ public:
         char star[2] = "*";
         memset(order, 0, sizeof(int) * 32);
         // Fill the conditions
+//printf("Patterns: %i\n", this->_n_triples);
         for (int i = 0; i < this->_n_triples; i++)
         {
             int ics = find_cond(this->_triples[i].s);
+//printf("%s\n", this->_triples[i].s);
             if (ics == -1)
                 ics = add_cond(this->_triples[i].s);
             int icp = find_cond(this->_triples[i].p);
@@ -1069,8 +1176,8 @@ public:
                     get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
             }
         }
-/*        
-printf("\Variables:\n");
+/*
+printf("Variables:\n");
 for(int x=0; x<n; x++) {
     int i = order[x];
     if(this->var[i].obj[0] != '?' && this->var[i].n == 0)
@@ -1142,17 +1249,22 @@ for(int i=0; i<this->_n_filters; i++) {
                         this->pre_comb_value = (char ***)malloc(1024 * sizeof(char **));
                         this->pre_comb_value_type = (char ***)malloc(1024 * sizeof(char **));
                         this->pre_comb_value_lang = (char ***)malloc(1024 * sizeof(char **));
+                        if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
                     }
                     else if (this->n_pcv % 1024 == 0) {
                         this->pre_comb_value = (char ***)realloc(this->pre_comb_value, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
                         this->pre_comb_value_type = (char ***)realloc(this->pre_comb_value_type, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
                         this->pre_comb_value_lang = (char ***)realloc(this->pre_comb_value_lang, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
+                        if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
                     }
                     this->pre_comb_value[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    if(!this->pre_comb_value[this->n_pcv]) out_of_memory();
                     memset(this->pre_comb_value[this->n_pcv], 0, 32 * sizeof(char *));
                     this->pre_comb_value_type[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    if(!this->pre_comb_value_type[this->n_pcv]) out_of_memory();
                     memset(this->pre_comb_value_type[this->n_pcv], 0, 32 * sizeof(char *));
                     this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    if(!this->pre_comb_value_lang[this->n_pcv]) out_of_memory();
                     memset(this->pre_comb_value_lang[this->n_pcv], 0, 32 * sizeof(char *));
                     for (int v = 0; v < 32; v++)
                     {
@@ -1226,8 +1338,9 @@ for(int i=0; i<this->_n_filters; i++) {
                             result = true;
                         if(fixed_lvalue) {
                             char *tmp = (char*)malloc(1024+strlen(lvalue));
+                            if(!tmp) out_of_memory();
                             strcpy(tmp, lvalue);
-                            this->resolve_prefix(tmp);
+                            this->resolve_prefix(&tmp);
                             res = strcmp(tmp, rvalue);
                             if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
                                 result = true;
@@ -1235,8 +1348,9 @@ for(int i=0; i<this->_n_filters; i++) {
                         }
                         if(fixed_rvalue) {
                             char *tmp = (char*)malloc(1024+strlen(rvalue));
+                            if(!tmp) out_of_memory();
                             strcpy(tmp, rvalue);
-                            this->resolve_prefix(tmp);
+                            this->resolve_prefix(&tmp);
                             res = strcmp(lvalue, tmp);
                             if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
                                 result = true;
@@ -1328,6 +1442,7 @@ for(int i=0; i<this->_n_filters; i++) {
                 } while( !resolved && iterations < 32 );
                 if(iterations == 32) {
                     char *answer = (char *)malloc(1024);
+                    if(!answer) out_of_memory();
                     sprintf(answer, "{\"Status\":\"Error\", \"Message\":\"Cannot resolve filters\"}", this->request_id);
                     return answer;
                 }
@@ -1346,6 +1461,7 @@ for(int i=0; i<this->_n_filters; i++) {
         char vars[1024 * 32], *result;
         bool first = true, first_val = true;
         result = (char *)malloc(1024 * 3 * this->n_pcv);
+        if(!result) out_of_memory();
         // Get rid of incomplete combinations (could be optimized)
         for (int z = 0; z < this->n_pcv; z++) {
             bool complete = true;
@@ -1373,6 +1489,7 @@ for(int i=0; i<this->_n_filters; i++) {
         }
         if(this->modifier & MOD_COUNT) {
             char *answer = (char *)malloc(1024);
+            if(!answer) out_of_memory();
             sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, this->n_pcv);
             return answer;
         }
@@ -1381,7 +1498,9 @@ for(int i=0; i<this->_n_filters; i++) {
             if(strcmp(this->_orders[j].direction, "desc") == 0) sort_order = 1;
             else sort_order = 0;
             char **unique = (char**)malloc(this->n_pcv*sizeof(char*));
+            if(!unique) out_of_memory();
             int *orders = (int*)malloc(this->n_pcv*sizeof(int));
+            if(!orders) out_of_memory();
             int sort_var_index = 0;
             for (int x = 0; x < n; x++) {
                 int i = order[x];
@@ -1420,6 +1539,9 @@ for(int i=0; i<this->_n_filters; i++) {
             char ***new_pre_comb_value = (char ***)malloc(this->n_pcv * sizeof(char **));
             char ***new_pre_comb_value_type = (char ***)malloc(this->n_pcv * sizeof(char **));
             char ***new_pre_comb_value_lang = (char ***)malloc(this->n_pcv * sizeof(char **));
+            if(!new_pre_comb_value) out_of_memory();
+            if(!new_pre_comb_value_type) out_of_memory();
+            if(!new_pre_comb_value_lang) out_of_memory();
             for (int y = 0; y < this->n_pcv; y++) {
                 new_pre_comb_value[y] = this->pre_comb_value[orders[y]];
                 new_pre_comb_value_type[y] = this->pre_comb_value_type[orders[y]];
@@ -1472,6 +1594,7 @@ for(int i=0; i<this->_n_filters; i++) {
         logger(LOG, "(child) Return triples chain", "", this->n_pcv);
 
         char *answer = (char *)malloc(1024 + strlen(vars) + strlen(result));
+        if(!answer) out_of_memory();
         sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", %s, %s}", reqid, vars, result);
 //printf(answer);
         free(result);
@@ -1492,6 +1615,7 @@ char *process_request(char *buffer, int operation, int endpoint, int modifier, i
     char *pmessage = NULL;
     if (!req.parse_request(buffer, &pmessage, 0, operation, endpoint, modifier, pip))
     {
+logger(LOG, "Goint to free_all", "", 0);
         req.free_all();
         return pmessage;
     }
@@ -1509,6 +1633,7 @@ char *process_request(char *buffer, int operation, int endpoint, int modifier, i
         }
         req.free_all();
         answer = (char *)malloc(1200);
+        if(!answer) out_of_memory();
         sprintf(answer, "{\"RequestId\":\"%s\", \"Status\":\"Ok\"}", req.request_id);
         return answer;
     }

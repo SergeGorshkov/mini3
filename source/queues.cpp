@@ -139,8 +139,6 @@ void listen_queues(void)
     logger(LOG, "mini3 queues listener starting", "", getpid());
     while (true)
     {
-        char endp[MAX_VALUE_LEN];
-        endp[0] = 0;
         if (strcmp(broker, "RabbitMQ") == 0)
         {
             amqp_rpc_reply_t res;
@@ -153,6 +151,7 @@ void listen_queues(void)
                 break;
             }
             char *req = (char *)malloc(envelope.message.body.len + 1);
+            if(!req) out_of_memory();
             memcpy(req, envelope.message.body.bytes, envelope.message.body.len);
             req[envelope.message.body.len] = 0;
             //logger(LOG, "Queue process\t", "Going to process request\n", 0);
@@ -196,6 +195,7 @@ void listen_queues(void)
             if (rkm->payload)
             {
                 char *rq = (char *)malloc(rkm->len + 1);
+                if(!rq) out_of_memory();
                 memcpy(rq, rkm->payload, rkm->len);
                 rq[rkm->len] = 0;
                 char *answer = process_request(rq, 0, 0, 0, global_web_pip);

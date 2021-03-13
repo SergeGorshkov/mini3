@@ -61,27 +61,36 @@ void read_from_pipe(int pip, local_triple *t)
         return;
     }
     read(pip, &a, sizeof(int));
+    t->s = (char *)malloc(a + 1);
+    if(!t->s) out_of_memory();
     read(pip, t->s, a);
     t->s[a] = 0;
     //logger(LOG, "Read s", t->s, a);
     read(pip, &a, sizeof(int));
+    t->p = (char *)malloc(a + 1);
+    if(!t->p) out_of_memory();
     read(pip, t->p, a);
     t->p[a] = 0;
-    //logger(LOG, "p", t->p, a);
+    //logger(LOG, "Read p", t->p, a);
     read(pip, &a, sizeof(int));
     t->o = (char *)malloc(a + 1);
+    if(!t->o) out_of_memory();
     read(pip, t->o, a);
     t->o[a] = 0;
-    //logger(LOG, "o", t->o, a);
+    //logger(LOG, "Read o", t->o, a);
     read(pip, &a, sizeof(int));
-    if (a)
+    if (a) {
+        t->d = (char *)malloc(a + 1);
+        if(!t->d) out_of_memory();
         read(pip, t->d, a);
-    t->d[a] = 0;
-    //logger(LOG, "d", t->d, a);
+        t->d[a] = 0;
+        //logger(LOG, "Read d", t->d, a);
+    }
+    else
+        t->d = NULL;
     read(pip, t->l, 8);
     //logger(LOG, "l", t->l, 8);
     sem_post(rsem);
-    //logger(LOG, "done reading", "", 0);
 }
 
 // Расширяет массив триплетов при необходимости
@@ -109,6 +118,7 @@ mini_index *rebuild_chunk_index(char *file, mini_index *index, unsigned long *si
     unsigned long newsize[MAX_CHUNKS];
     memset(newsize, 0, sizeof(unsigned long) * MAX_CHUNKS);
     mini_index *tmp = (mini_index *)malloc((*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+    if(!tmp) out_of_memory();
     memcpy(tmp, index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
     munmap(index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
     mini_index *newindex = (mini_index *)mmap_file(O_RDWR, file, (*n_chunks) * 2 * CHUNK_SIZE * sizeof(mini_index));
@@ -175,6 +185,7 @@ logger(LOG, "\n", "", 0); */
 
 bool check_chunk_size(mini_index *idx, unsigned long size, unsigned long n)
 {
+//logger(LOG, "Check chunk size", "", size);
     if (size != CHUNK_SIZE)
         return false;
     unsigned long offset = n * CHUNK_SIZE;
@@ -183,6 +194,7 @@ bool check_chunk_size(mini_index *idx, unsigned long size, unsigned long n)
         if (idx[offset + i].mini_hash != idx[offset].mini_hash)
             return true;
     }
+//logger(LOG, "Check chunk size", "return false", 0);
     return false;
 }
 
@@ -201,6 +213,7 @@ void rebuild_chunks(void)
     chunk_bits++;
     for (int i = 0; i < (*n_chunks); i++)
     {
+//logger(LOG, "Check chunk", "", i);
         if (check_chunk_size(full_index, chunks_size[i], i) || check_chunk_size(s_index, s_chunks_size[i], i) || check_chunk_size(p_index, p_chunks_size[i], i) || check_chunk_size(o_index, o_chunks_size[i], i))
         {
             rebuild_chunks();
@@ -214,6 +227,7 @@ unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chu
     unsigned long target_chunk = 0, pos = 0;
     unsigned long mini_hash = get_mini_hash_char(s);
     _find_using_index(index, f_chunks_size, mini_hash, &pos, &target_chunk);
+//logger(LOG, "insert_into_index", s, pos);
     // Если попадается много одинаковых идентификаторов в s, p или o, chunk может переполниться. В этом случае ищем соседний chunk
     if (f_chunks_size[target_chunk] == CHUNK_SIZE)
     {
@@ -249,41 +263,43 @@ unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chu
     f_chunks_size[target_chunk]++;
     index[pos].index = *n_triples;
     index[pos].mini_hash = mini_hash;
-//printf("pos = %lu, chunk = %i, %i triples in chunk\n", pos, target_chunk, f_chunks_size[target_chunk]);
+    /*
+char str[1024];
+sprintf(str, "Insert: pos = %lu, chunk = %i, %i triples in chunk\n", pos, target_chunk, f_chunks_size[target_chunk]);
+logger(LOG, str, "", 0); */
     return target_chunk;
 }
 
 char *global_commit_triple(local_triple *t)
 {
     unsigned long pos = 0;
-    char message[1024];
+    char message[10240];
     /*
 sprintf(message, "%lu", t->mini_hash);
 logger(LOG, "(parent) Global commit", message, *n_triples); */
 
     unsigned long target_chunk = 0;
     long ind = find_using_index(full_index, chunks_size, t->hash, t->mini_hash, &pos, &target_chunk);
-/*    
+/*
 sprintf(message,"(parent) Triple %s with hash %lx has ind %i, pos %lu in chunk %lu", t->o, t->mini_hash, ind, pos, target_chunk);
-printf("%s\n",message);
 logger(LOG, message, "", 0);
 */
     // Если такой триплет уже есть - пропускаем
     if (ind > -1)
     {
         // Если он удален - восстанавливаем
-        if (triples[ind].status == STATUS_DELETED)
+        if (triples[full_index[ind].index].status == STATUS_DELETED)
         {
             sem_wait(sem);
-            triples[ind].status = 0;
+            triples[full_index[ind].index].status = 0;
             sem_post(sem);
         }
         return NULL;
     }
-    //logger(LOG, "(parent) Waiting for semaphore", "", getpid());
+//logger(LOG, "(parent) Waiting for semaphore", "", getpid());
     sem_wait(sem);
-    //sprintf(message, "%lu of %lu", *n_triples, *allocated);
-    //logger(LOG, "(parent) Continue", message, getpid());
+//sprintf(message, "%lu of %lu", *n_triples, *allocated);
+//logger(LOG, "(parent) Continue", message, getpid());
     if (*n_triples >= *allocated)
     {
         sem_post(sem);
@@ -299,11 +315,17 @@ logger(LOG, message, "", 0);
     triples[*n_triples].p_pos = add_string(t->p, *n_triples);
     triples[*n_triples].o_len = strlen(t->o);
     triples[*n_triples].o_pos = add_string(t->o, *n_triples);
-    triples[*n_triples].d_len = strlen(t->d);
-    triples[*n_triples].d_pos = add_string(t->d, *n_triples);
+    if(t->d) {
+        triples[*n_triples].d_len = strlen(t->d);
+        triples[*n_triples].d_pos = add_string(t->d, *n_triples);
+    }
+    else {
+        triples[*n_triples].d_len = 0;
+        triples[*n_triples].d_pos = 0;
+    }
 
-    sprintf(message,"insert into main index: chunk = %lu, offset = %lu, pos = %lu\n", target_chunk, target_chunk * CHUNK_SIZE + chunks_size[target_chunk], pos);
-    //logger(LOG, message, "", 0);
+//sprintf(message,"insert into main index: chunk = %lu, offset = %lu, pos = %lu\n", target_chunk, target_chunk * CHUNK_SIZE + chunks_size[target_chunk], pos);
+//logger(LOG, message, "", 0);
     if (target_chunk * CHUNK_SIZE + chunks_size[target_chunk] - pos > 0)
         memmove((void *)((unsigned long)full_index + (pos + 1) * sizeof(mini_index)),
                 (void *)((unsigned long)full_index + pos * sizeof(mini_index)),
@@ -322,6 +344,7 @@ logger(LOG, message, "", 0);
         rebuild_chunks();
     sem_post(sem);
     save_globals();
+//logger(LOG, "Insert done", "", 0);
     return NULL;
 }
 

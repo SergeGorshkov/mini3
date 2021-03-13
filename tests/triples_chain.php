@@ -14,7 +14,7 @@ function request( $method, $endpoint, $query ) {
 }
 
 // Send prefixes
-echo("PUT prefixes\n");
+echo("1. PUT prefixes\n");
 $req = [ 'RequestId' => '1',
 	 'Prefix' => [ 
 		    [ '' => 'http://localhost/' ],
@@ -24,12 +24,14 @@ $req = [ 'RequestId' => '1',
 		    [ 'xsd' => 'http://www.w3.org/2001/XMLSchema#' ],
 		    [ 'foaf' => 'http://xmlns.com/foaf/0.1/' ] ] ];
 $st = microtime(true);
-print_r(request( 'PUT', 'prefix', $req ));
+$res = request( 'PUT', 'prefix', $req );
 $et = microtime(true);
-echo(($et-$st)."\n");
+if($res->Status == 'Ok') echo("OK");
+else echo("ERROR!");
+echo(" ".round($et-$st,3)."\n");
 
 // Populate database with triples
-$req = [    'RequestId' => '1',
+$req = [    'RequestId' => '2',
 	    'Pattern' => [
 		[ 'Person', 'rdf:type', 'owl:Class' ],
 		[ 'Language', 'rdf:type', 'owl:Class' ],
@@ -72,8 +74,11 @@ $req = [    'RequestId' => '1',
                 [ 'C++', 'isKnownBy', 'Jane' ]
             ]
             ];
-echo("PUT triples\n");
-print_r(request( 'PUT', 'triple', $req ));
+echo("2. PUT triples\n");
+$res = request( 'PUT', 'triple', $req );
+if($res->Status == 'Ok') echo("OK");
+else echo("ERROR!");
+echo(" ".round($et-$st,3)."\n");
 
 $req = [    'RequestId' => '3',
 	    'Chain' => [
@@ -98,11 +103,13 @@ $req = [    'RequestId' => '3',
             ]
             ];
 
-echo("GET chain\n");
+echo("3. GET chain\n");
 $st = microtime(true);
 $res = request('GET', 'chain', $req );
 $et = microtime(true);
-echo("GET chain: ".($et-$st)."\n");
+if($res->Status == 'Ok') echo("OK");
+else echo("ERROR!");
+echo(" ".round($et-$st,3)."\n");
 
 // Print table
 foreach($res->Vars as $rr) {
@@ -115,20 +122,6 @@ foreach($res->Result as $rr) {
     }
     echo("\n");
 }
-exit;
 
-// Get triples by pattern
-$req = [	'RequestId' => '5',
-		'Pattern' => [
-			[ 'Jack', "*", "*" ]
-		],
-		'Order' => [
-			[ 'predicate', 'desc' ],
-			[ 'object', 'asc' ]
-		]
-	];
-echo("GET triple\n");
-$res = request('GET', 'triple', $req );
-print_r($res);
 
 ?>

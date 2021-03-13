@@ -16,6 +16,7 @@ unsigned long get_mini_hash_char(char *value)
     unsigned long mini_hash = 0;
     int j = strlen(value);
     char *invalue = (char *)malloc(j + 1);
+    if(!invalue) out_of_memory();
     memcpy(invalue, value, j + 1);
     int o = (j > SHA_DIGEST_LENGTH ? j - SHA_DIGEST_LENGTH : 0);
     int l = (j > SHA_DIGEST_LENGTH ? SHA_DIGEST_LENGTH : j);
@@ -44,8 +45,9 @@ long _find_using_index(mini_index *idx, unsigned long *n, unsigned long mini_has
     *pos = offset;
     if (n == 0)
         return -1;
-    /* char message[1024];
-sprintf(message, "Chunk = %lu, offset = %lu, size = %lu, bits = %i", *chunk, offset, local_n, chunk_bits);
+    char message[1024];
+/* sprintf(message, "Chunk = %lu, offset = %lu, size = %lu, bits = %i", *chunk, offset, local_n, chunk_bits);
+printf("%s\n", message);
 logger(LOG, message, "", 0);
 logger(LOG, "hash", "", idx[r-1].mini_hash); */
     if (n[*chunk] == 0)
@@ -57,8 +59,8 @@ logger(LOG, "hash", "", idx[r-1].mini_hash); */
     {
         // Цель этого цикла - найти либо равный элемент, либо такой, который больше, но перед ним стоит тот, который меньше
         unsigned long m = ((l + r) >> 1);
-        /* sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, %020lu", m, l, r, idx[m].mini_hash, mini_hash);
-logger(LOG, message, "", 0); */
+        /* sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, mini_hash = %020lu (%lx, %lx)", m, l, r, idx[m].mini_hash, mini_hash, idx[m].mini_hash, mini_hash);
+        logger(LOG, message, "", 0); */
         // Если мы стоим у левой границы массива, то простая вилка: если первый элемент меньше, то перед ним, если больше, то после него
         if (m == offset)
         {
@@ -114,7 +116,7 @@ logger(LOG, message, "", 0); */
                 l = m;
             else
             {
-                *pos = m;
+                *pos = m + 1;
                 return -1;
             }
         }
@@ -177,16 +179,24 @@ long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, un
 
 unsigned long *find_matching_triples(char *subject, char *predicate, char *object, char *datatype, char *lang, unsigned long *n)
 {
-    char data[MAX_VALUE_LEN * 5 + 128];
     unsigned char hash[SHA_DIGEST_LENGTH];
     long ind;
     unsigned long mini_hash, pos = 0, chunk = 0, size = 1024, *cand = (unsigned long *)malloc(sizeof(unsigned long *) * size);
+    if(!cand) out_of_memory();
     if (subject[0] != '*' && predicate[0] != '*' && object[0] != '*')
     {
-        sprintf(data, "%s | %s | %s | %s | %s", subject, predicate, object, datatype, lang);
+        int datatype_len = 0;
+        if(datatype != NULL)
+            datatype_len = strlen(datatype);
+        char *data = (char*)malloc(strlen(subject) + strlen(predicate) + strlen(object) + datatype_len + 1024);
+        if(!data) out_of_memory();
+        sprintf(data, "%s | %s | %s | %s", subject, predicate, object, lang);
+        if(datatype_len)
+            strcat(data, datatype);
         memset(hash, 0, SHA_DIGEST_LENGTH);
         SHA1((unsigned char *)data, strlen(data), hash);
         mini_hash = get_mini_hash(hash);
+        free(data);
         ind = find_using_index(full_index, chunks_size, hash, mini_hash, &pos, &chunk);
         if (ind == -1)
             return NULL;
@@ -293,7 +303,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     {
         mini_hash = get_mini_hash_char(predicate);
         ind = _find_using_index(p_index, p_chunks_size, mini_hash, &pos, &chunk);
-        if (ind > 0)
+        if (ind > -1)
         {
             while (ind > 0 && p_index[ind - 1].mini_hash == mini_hash)
                 ind--;

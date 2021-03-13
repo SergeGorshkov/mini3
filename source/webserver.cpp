@@ -5,49 +5,54 @@ void web(int fd, int hit, int *pip)
 	int j, file_fd, buflen;
 	long i, ret, len;
 	char *fstr, *answer;
-	static char buffer[BUFSIZE + 1];
+	char *buffer;
 	int operation = 0, endpoint = 0, modifier = 0;
 
-	memset(buffer, 0, BUFSIZE + 1);
+	buffer = (char*)malloc(BUFSIZE*2 + 1);
+	if(!buffer) out_of_memory(fd);
+	buffer[0] = 0;
 	int pos = 0, content_length = 0, content_start = 0;
 	do
 	{
 		if (pos != 0 && content_length != 0 && (pos >= content_start + content_length))
 			break;
-		ret = read(fd, (void *)((long)buffer + pos), BUFSIZE - pos); /* read Web request in one go */
+		ret = read(fd, (void *)((unsigned long)buffer + pos), BUFSIZE); /* read Web request in one go */
 		if (ret > 0)
 			pos += ret;
-		if (!content_length || !content_start)
+		if (content_length == 0 || content_start == 0)
 		{
 			for (int k = 0; k < pos; k++)
 			{
 				if (buffer[k] == 'C')
 				{
-					if (strncmp((char *)((long)buffer + k), "Content-Length", 14) == 0)
+					if (content_length == 0 && strncmp((char *)((unsigned long)buffer + k), "Content-Length", 14) == 0)
 					{
 						k += 16;
 						int start = k;
 						while (buffer[k] >= '0' && buffer[k] <= '9')
 							k++;
-						if (k > start)
+						if (k > start && k-start < 1023)
 						{
 							char sub[1024];
-							memcpy(sub, (void *)((long)buffer + start), k - start);
+							memcpy(sub, (void *)((unsigned long)buffer + start), k - start);
 							sub[k - start] = 0;
 							content_length = atoi(sub);
+							buffer = (char*)realloc(buffer, BUFSIZE + content_length);
+							if(!buffer)
+								logger(FORBIDDEN, "Request is too large", "", fd);
 						}
 					}
 				}
-				if (buffer[k] == 0x0d && buffer[k + 1] == 0x0a && buffer[k + 2] == 0x0d && buffer[k + 3] == 0x0a)
+				if (content_start == 0 && buffer[k] == 0x0d && buffer[k + 1] == 0x0a && buffer[k + 2] == 0x0d && buffer[k + 3] == 0x0a)
 					content_start = k + 4;
 			}
 		}
 	} while (ret > 0);
-	if (pos > 0 && pos < BUFSIZE) /* return code is valid chars */
+	if (pos > 0 && pos < ( content_length > 0 ? BUFSIZE + content_length : BUFSIZE ))
 		buffer[pos] = 0;		  /* terminate the buffer */
 	else
 		buffer[0] = 0;
-	for (i = 0; i < ret; i++) /* remove CF and LF characters */
+	for (i = 0; i < content_start; i++) /* remove CF and LF characters */
 		if (buffer[i] == '\r' || buffer[i] == '\n')
 			buffer[i] = '*';
 	//	logger(LOG,"request (webserver)",buffer,hit);
@@ -75,10 +80,13 @@ void web(int fd, int hit, int *pip)
 		logger(FORBIDDEN, "Endpoint is not specified", buffer, fd);
 
 	char *rp = (char *)malloc(strlen(buffer) + 1);
+    if(!rp) out_of_memory(fd);
 	strcpy(rp, (char *)((long)strstr(buffer, "request=") + 8));
-	if (rp == NULL || strlen(rp) == 0)
-		logger(FORBIDDEN, "No request= parameter is given", buffer, fd);
-	//	logger(LOG,"Param",rp,fd);
+	if (rp == NULL || strlen(rp) == 0) {
+		free(buffer);
+		logger(FORBIDDEN, "No request= parameter is given", "", fd);
+	}
+	logger(LOG, "Request", rp, hit);
 	char *response = process_request(rp, operation, endpoint, modifier, pip);
 	len = strlen(response);
 	(void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: mini3/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: application/json\n\n", VERSION, len); // Header + a blank line
@@ -87,6 +95,7 @@ void web(int fd, int hit, int *pip)
 	(void)write(fd, buffer, strlen(buffer));
 	(void)write(fd, response, len);
 	free(response);
+	free(buffer);
 	close(fd);
 	exit(1);
 }

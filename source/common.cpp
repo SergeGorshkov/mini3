@@ -2,6 +2,7 @@ void logger(int type, char *s1, char *s2, int socket_fd)
 {
     int fd;
     char *logbuffer = (char *)malloc(strlen(s1) + strlen(s2) + 1024);
+    if(!logbuffer) out_of_memory(socket_fd);
 
     switch (type)
     {
@@ -66,6 +67,7 @@ char *file_get_contents(char *filename)
     len = (long)lseek(file_fd, (off_t)0, SEEK_END);
     (void)lseek(file_fd, (off_t)0, SEEK_SET);
     buffer = (char *)malloc(len + 1);
+    if(!buffer) out_of_memory();
     read(file_fd, buffer, len);
     close(file_fd);
     buffer[len] = 0;
@@ -121,6 +123,7 @@ void descreen(char *s)
 {
     int len = strlen(s), newi = 0;
     char *newstr = (char *)malloc(len + 1);
+    if(!newstr) out_of_memory();
     for (int i = 0; i < len; i++)
     {
         if (s[i] == '\\' && s[i + 1] == '/')
@@ -140,6 +143,7 @@ void replacedot(char *s, bool direction)
 {
     int len = strlen(s), newi = 0;
     char *newstr = (char *)malloc(len + 1024);
+    if(!newstr) out_of_memory();
     for (int i = 0; i < len; i++)
     {
         if (direction)
@@ -190,6 +194,7 @@ char *str_replace(const char *s, const char *oldW, const char *newW)
     }
 
     result = (char *)malloc(i + cnt * (newWlen - oldWlen) + 1);
+    if(!result) out_of_memory();
 
     i = 0;
     while (*s)
@@ -212,6 +217,7 @@ void unicode_to_utf8(char *buffer)
 {
     int tp = 0, r = strlen(buffer);
     char *t = (char *)malloc(r + 1);
+    if(!t) out_of_memory();
     for (int i = 0; i < r; i++)
     {
         if (buffer[i] == '\\' && buffer[i + 1] == 'u')
@@ -284,6 +290,7 @@ int json_to_array(char *json, char **arr)
             if (started)
             {
                 arr[n] = (char *)malloc(i - start + 1);
+                if(!arr[n]) out_of_memory();
                 memcpy(arr[n], (void *)((long)json + start + 1), i - start - 1);
                 arr[n][i - start - 1] = 0;
                 n++;
@@ -326,8 +333,7 @@ unsigned char *base64_encode(const unsigned char *src, size_t len, size_t *out_l
     if (olen < len)
         return NULL; /* integer overflow */
     out = (unsigned char *)malloc(olen);
-    if (out == NULL)
-        return NULL;
+    if(!out) out_of_memory();
 
     end = src + len;
     in = src;
@@ -408,8 +414,7 @@ unsigned char *base64_decode(const unsigned char *src, size_t len, size_t *out_l
 
     olen = count / 4 * 3;
     pos = out = (unsigned char *)malloc(olen);
-    if (out == NULL)
-        return NULL;
+    if(!out) out_of_memory();
 
     count = 0;
     for (i = 0; i < len; i++)
@@ -455,3 +460,22 @@ int cstring_cmp(const void *a, const void *b) {
     int res = strcmp(*ia, *ib);
     return sort_order ? -res : res;
 }
+
+void out_of_memory(void) {
+    static char s[] = "Out of memory\n";
+    int fd;
+    if ((fd = open("mini3.log", O_CREAT | O_WRONLY | O_APPEND, 0644)) >= 0)
+    {
+        (void)write(fd, s, strlen(s));
+        (void)write(fd, "\n", 1);
+        close(fd);
+    }
+    exit(1);
+}
+
+void out_of_memory(int fd) {
+    (void)write(fd, "HTTP/1.1 403 Forbidden\nContent-Length: 104\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nOut of memory\n</body></html>\n", 191);
+    close(fd);
+    out_of_memory();
+}
+
