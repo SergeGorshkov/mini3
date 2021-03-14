@@ -276,8 +276,8 @@ char *global_commit_triple(local_triple *t)
     char message[10240];
     /*
 sprintf(message, "%lu", t->mini_hash);
-logger(LOG, "(parent) Global commit", message, *n_triples); */
-
+logger(LOG, "(parent) Global commit", message, *n_triples);
+*/
     unsigned long target_chunk = 0;
     long ind = find_using_index(full_index, chunks_size, t->hash, t->mini_hash, &pos, &target_chunk);
 /*
@@ -353,7 +353,7 @@ void save_globals(void)
     sem_wait(sem);
     *(unsigned long *)global_block_ul = *n_triples;
     *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long)) = *n_prefixes;
-    *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2) = *db_version;
+    *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2) = 0;
     *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 3) = *allocated;
     *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 4) = *string_allocated;
     *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 5) = *string_length;

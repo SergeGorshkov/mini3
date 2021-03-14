@@ -48,8 +48,8 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     }
     sem_post(lsem);
     free(logbuffer);
-    if (type == ERROR || type == NOTFOUND || type == FORBIDDEN) {
-	close(socket_fd);
+    if ((type == ERROR || type == NOTFOUND || type == FORBIDDEN) && socket_fd > 0) {
+        close(socket_fd);
         exit(1);
     }
 }

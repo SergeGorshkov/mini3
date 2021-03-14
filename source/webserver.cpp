@@ -50,10 +50,10 @@ void web(int fd, int hit, int *pip)
 	} while (ret > 0);
 
 	if (pos > 0 && pos < ( content_length > 0 ? BUFSIZE + content_length : BUFSIZE ))
-		buffer[pos] = 0;		  /* terminate the buffer */
+		buffer[pos] = 0;
 	else
 		buffer[0] = 0;
-	for (i = 0; i < content_start; i++) /* remove CF and LF characters */
+	for (i = 0; i < content_start; i++)
 		if (buffer[i] == '\r' || buffer[i] == '\n')
 			buffer[i] = '*';
 	if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0)
@@ -111,15 +111,10 @@ int start_web_server(int argc, char **argv)
 	static struct sockaddr_in serv_addr; /* static = initialised to zeros */
 
 	printf("Start web server\n");
-	#ifndef CONTAINER_VERSION
-	/* Become deamon + unstopable and no zombies children (= no wait()) */
 	if (fork() != 0)
 		return 0;
-	/* parent returns OK to shell */
-	(void)signal(SIGCHLD, SIG_IGN); /* ignore child death */
-	(void)signal(SIGHUP, SIG_IGN);	/* ignore terminal hangups */
-	//(void)setpgrp();		/* break away from process group */
-	#endif
+	(void)signal(SIGCHLD, SIG_IGN);
+	(void)signal(SIGHUP, SIG_IGN);
 
 	triples = NULL;
 	full_index = NULL;
@@ -144,11 +139,9 @@ int start_web_server(int argc, char **argv)
 		logger(ERROR, "system call", "listen", 0);
 	for (hit = 1;; hit++)
 	{
-printf("%i\n", hit);
 		length = sizeof(cli_addr);
 		if ((socketfd = accept(listenfd, (struct sockaddr *)&cli_addr, &length)) < 0)
 			logger(ERROR, "system call", "accept", 0);
-		int command;
 		if ((pid = fork()) < 0)
 			logger(ERROR, "system call", "fork", 0);
 		else

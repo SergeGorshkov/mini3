@@ -28,7 +28,7 @@ $st = microtime(true);
 $res = request( 'PUT', 'prefix', $req );
 $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Delete one prefix
@@ -40,7 +40,7 @@ $st = microtime(true);
 $res = request( 'DELETE', 'prefix', $req );
 $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Get remaining prefixes
@@ -49,7 +49,7 @@ $st = microtime(true);
 $res = request( 'GET', 'prefix', [ 'RequestId' => '3' ] );
 $et = microtime(true);
 if($res->Status == 'Ok' && isset($res->Prefixes) && sizeof($res->Prefixes) == 6) echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Send some triples
@@ -67,7 +67,7 @@ $st = microtime(true);
 $res = request( 'PUT', 'triple', $req );
 $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Delete some triples
@@ -82,7 +82,7 @@ $st = microtime(true);
 $res = request( 'DELETE', 'triple', $req );
 $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Get deleted triples (shall return nothing)
@@ -96,7 +96,7 @@ $st = microtime(true);
 $res = request( 'GET', 'triple', $req );
 $et = microtime(true);
 if($res->Status == 'Ok' && !isset($res->Triples)) echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Get triples count
@@ -110,7 +110,7 @@ $st = microtime(true);
 $res = request( 'GET', 'triple/count', $req );
 $et = microtime(true);
 if($res->Status == 'Ok' && $res->Count == 4) echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Get the remaining triples
@@ -124,7 +124,7 @@ $st = microtime(true);
 $res = request( 'GET', 'triple', $req );
 $et = microtime(true);
 if($res->Status == 'Ok' && sizeof($res->Triples) == 4) echo("OK");
-else echo("ERROR!");
+else echo("ERROR! ".print_r($res, true));
 echo("\t".round($et-$st,3)."\n");
 
 // Get triples by pattern with sorting
@@ -141,7 +141,7 @@ $req = [	'RequestId' => '9',
 $st = microtime(true);
 $res = request('GET', 'triple', $req );
 $et = microtime(true);
-if(!isset($res->Triples) || sizeof($res->Triples) != 4 || $res->Triples[0][0] != 'http://localhost/John' || $res->Triples[1][0] != 'http://localhost/Jane' || $res->Triples[2][0] != 'http://localhost/Jack' || $res->Triples[3][0] != 'http://localhost/Jack' || $res->Triples[2][2] != 'http://localhost/C++' || $res->Triples[3][2] != 'http://localhost/PHP')  echo("ERROR!");
+if(!isset($res->Triples) || sizeof($res->Triples) != 4 || $res->Triples[0][0] != 'http://localhost/John' || $res->Triples[1][0] != 'http://localhost/Jane' || $res->Triples[2][0] != 'http://localhost/Jack' || $res->Triples[3][0] != 'http://localhost/Jack' || $res->Triples[2][2] != 'http://localhost/C++' || $res->Triples[3][2] != 'http://localhost/PHP')  echo("ERROR! ".print_r($res, true));
 else echo("OK");
 echo("\t".round($et-$st,3)."\n");
 
@@ -163,7 +163,7 @@ $req = [	'RequestId' => '10b',
 $st = microtime(true);
 $res = request('GET', 'triple', $req );
 $et = microtime(true);
-if(!isset($res->Triples) || sizeof($res->Triples) != 5 || $res->Triples[0][0] != 'http://localhost/Jack')  echo("ERROR!");
+if(!isset($res->Triples) || sizeof($res->Triples) != 5 || $res->Triples[0][0] != 'http://localhost/Jack')  echo("ERROR! ".print_r($res, true));
 else echo("OK");
 echo("\t".round($et-$st,3)."\n");
 
@@ -186,7 +186,7 @@ $req = [	'RequestId' => '11b',
 $st = microtime(true);
 $res = request('GET', 'triple', $req );
 $et = microtime(true);
-if(!isset($res->Triples)) echo("ERROR!");
+if(!isset($res->Triples)) echo("ERROR! ".print_r($res, true));
 else {
     $passed = true;
     foreach($res->Triples as $triple) {
@@ -204,7 +204,7 @@ else {
 	}
     }
     if($passed) echo("OK");
-    else echo("ERROR!");
+    else echo("ERROR! ".print_r($res, true));
 }
 echo("\t".round($et-$st,3)."\n");
 

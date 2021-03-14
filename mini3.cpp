@@ -4,7 +4,6 @@
 #define MULTITHREAD
 #define LISTEN_QUEUES
 #define WEBSERVER
-#define CONTAINER_VERSION
 #define VERBOSE
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,10 +87,11 @@ int main(int argc, char **argv)
 	fcntl(global_web_pip[0], F_SETPIPE_SZ, PIPESIZE);
 	fcntl(global_web_pip[1], F_SETPIPE_SZ, PIPESIZE);
 #ifdef WEBSERVER
-	if (argc < 2 || argc > 2 || !strcmp(argv[1], "-?"))
+	if (argc < 2 || argc > 3 || !strcmp(argv[1], "-?"))
 	{
-		(void)printf("Usage: mini3 Port-Number\n\n"
-					 "\tExample: mini3 8080\n\n");
+		(void)printf("Usage: mini-3 Port-Number [-n]\n\n"
+					 "\tExample: mini-3 8080\n"
+					 "\t-n means that the servel shall not become a daemon. It will not return to the console until stopped.\n\n");
 		exit(0);
 	}
 	start_web_server(argc, argv);
@@ -103,11 +103,18 @@ int main(int argc, char **argv)
 	printf("Started!\n\n");
 
 #if defined(WEBSERVER) || defined(LISTEN_QUEUES)
-	if (fork() != 0)
-		exit(0);
-	// Since this point works only the child process which listens pipe and performs transactions
-	(void)signal(SIGCHLD, SIG_IGN);
-	(void)signal(SIGHUP, SIG_IGN);
+	bool nodaemon = false;
+	if(argc == 3) {
+		if(strcmp(argv[2], "-n") == 0)
+			nodaemon = true;
+	}
+	if(!nodaemon) {
+		// Since this point works only the child process which listens pipe and performs transactions
+		if (fork() != 0)
+			exit(0);
+		(void)signal(SIGCHLD, SIG_IGN);
+		(void)signal(SIGHUP, SIG_IGN);
+	}
 	init_globals(O_RDWR);
 	while (true)
 	{

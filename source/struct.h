@@ -153,7 +153,7 @@ unsigned long *global_block_ul = NULL;
 prefix *prefixes = NULL;
 triple *triples = NULL;
 mini_index *full_index = NULL, *s_index = NULL, *p_index = NULL, *o_index = NULL;
-unsigned long *n_chunks = 0, *n_triples = 0, *n_prefixes = 0, *string_allocated = 0, *string_length = 0, *allocated = 0, *db_version = 0;
+unsigned long *active_requests = 0, *n_chunks = 0, *n_triples = 0, *n_prefixes = 0, *string_allocated = 0, *string_length = 0, *allocated = 0;
 unsigned long *chunks_size = 0, *s_chunks_size = 0, *p_chunks_size = 0, *o_chunks_size = 0;
 bool chunks_rebuilt = false, triples_reallocated = false;
 int chunk_bits = 0;
@@ -214,7 +214,7 @@ void init_globals(int mode)
     }
     n_triples = (unsigned long *)global_block_ul;
     n_prefixes = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long));
-    db_version = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2);
+    active_requests = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2);
     allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 3);
     string_allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 4);
     string_length = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 5);
