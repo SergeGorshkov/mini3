@@ -1,1 +1,1 @@
-{"database":"database/","database_flush_timeout":"10","broker":"RabbitMQ","broker_host":"127.0.0.1","broker_port":"5672","broker_user":"serge","broker_password":"topVz1293","broker_queue":"mini3_in","broker_output_queue":"mini3_out"}
+{"database":"database/","database_flush_timeout":"10","broker":"","broker_host":"127.0.0.1","broker_port":"5672","broker_user":"serge","broker_password":"topVz1293","broker_queue":"mini3_in","broker_output_queue":"mini3_out"}

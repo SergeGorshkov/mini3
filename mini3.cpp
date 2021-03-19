@@ -4,6 +4,7 @@
 #define MULTITHREAD
 #define LISTEN_QUEUES
 #define WEBSERVER
+#define CONTAINER_VERSION
 #define VERBOSE
 #include <stdio.h>
 #include <stdlib.h>

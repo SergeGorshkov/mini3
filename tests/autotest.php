@@ -8,7 +8,7 @@ function request( $method, $endpoint, $query ) {
             'content' => 'request=' . json_encode( $query ),
         ),
     ) );
-    $response = file_get_contents( "http://localhost:8081/" . $endpoint, false, $context );
+    $response = file_get_contents( "http://localhost:8082/" . $endpoint, false, $context );
 //echo("Return: ".$response."\n");
     return json_decode( $response );
 }

@@ -129,6 +129,7 @@ void listen_queues(void)
         if (!ork)
             logger(ERROR, "Failed to create Kafka producer", errstr, 0);
     }
+    else return;
 
     // В отдельном потоке слушает Rabbit или Kafka
     printf("Start listening queues\n");
@@ -136,7 +137,7 @@ void listen_queues(void)
         return;
     (void)signal(SIGCHLD, SIG_IGN);
     (void)signal(SIGHUP, SIG_IGN);
-    logger(LOG, "mini3 queues listener starting", "", getpid());
+    logger(LOG, "mini-3 queues listener starting", "", getpid());
     while (true)
     {
         if (strcmp(broker, "RabbitMQ") == 0)

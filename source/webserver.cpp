@@ -1,5 +1,5 @@
 
-/* this is a child web server process, so we can exit on errors */
+// Child web server function
 void web(int fd, int hit, int *pip)
 {
 	int j, file_fd, buflen;
@@ -16,7 +16,7 @@ void web(int fd, int hit, int *pip)
 	{
 		if (pos != 0 && content_length != 0 && (pos >= content_start + content_length))
 			break;
-		ret = read(fd, (void *)((unsigned long)buffer + pos), BUFSIZE); /* read Web request in one go */
+		ret = read(fd, (void *)((unsigned long)buffer + pos), BUFSIZE);
 		if (ret > 0)
 			pos += ret;
 		if (content_length == 0 || content_start == 0)
@@ -48,6 +48,7 @@ void web(int fd, int hit, int *pip)
 			}
 		}
 	} while (ret > 0);
+
 	if (pos > 0 && pos < ( content_length > 0 ? BUFSIZE + content_length : BUFSIZE ))
 		buffer[pos] = 0;		  /* terminate the buffer */
 	else
@@ -55,7 +56,6 @@ void web(int fd, int hit, int *pip)
 	for (i = 0; i < content_start; i++) /* remove CF and LF characters */
 		if (buffer[i] == '\r' || buffer[i] == '\n')
 			buffer[i] = '*';
-	//	logger(LOG,"request (webserver)",buffer,hit);
 	if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0)
 		operation = OP_GET;
 	else if (strncmp(buffer, "POST ", 5) == 0 || strncmp(buffer, "post ", 5) == 0)
@@ -80,8 +80,11 @@ void web(int fd, int hit, int *pip)
 		logger(FORBIDDEN, "Endpoint is not specified", buffer, fd);
 
 	char *rp = (char *)malloc(strlen(buffer) + 1);
-    if(!rp) out_of_memory(fd);
-	strcpy(rp, (char *)((long)strstr(buffer, "request=") + 8));
+	if(!rp) out_of_memory(fd);
+	char *req = strstr(buffer, "request=");
+	if(!req)
+		logger(FORBIDDEN, "No request= parameter is given", "", fd);
+	strcpy(rp, (char *)((unsigned long)req + 8));
 	if (rp == NULL || strlen(rp) == 0) {
 		free(buffer);
 		logger(FORBIDDEN, "No request= parameter is given", "", fd);
@@ -108,12 +111,15 @@ int start_web_server(int argc, char **argv)
 	static struct sockaddr_in serv_addr; /* static = initialised to zeros */
 
 	printf("Start web server\n");
+	#ifndef CONTAINER_VERSION
 	/* Become deamon + unstopable and no zombies children (= no wait()) */
 	if (fork() != 0)
-		return 0;					/* parent returns OK to shell */
+		return 0;
+	/* parent returns OK to shell */
 	(void)signal(SIGCHLD, SIG_IGN); /* ignore child death */
 	(void)signal(SIGHUP, SIG_IGN);	/* ignore terminal hangups */
-									//(void)setpgrp();		/* break away from process group */
+	//(void)setpgrp();		/* break away from process group */
+	#endif
 
 	triples = NULL;
 	full_index = NULL;
@@ -122,7 +128,7 @@ int start_web_server(int argc, char **argv)
 	o_index = NULL;
 	stringtable = NULL;
 	global_block_ul = NULL;
-	logger(LOG, "mini3 web server starting", argv[1], getpid());
+	logger(LOG, "mini-3 web server starting", argv[1], getpid());
 	/* setup the network socket */
 	if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		logger(ERROR, "system call", "socket", 0);
@@ -138,6 +144,7 @@ int start_web_server(int argc, char **argv)
 		logger(ERROR, "system call", "listen", 0);
 	for (hit = 1;; hit++)
 	{
+printf("%i\n", hit);
 		length = sizeof(cli_addr);
 		if ((socketfd = accept(listenfd, (struct sockaddr *)&cli_addr, &length)) < 0)
 			logger(ERROR, "system call", "accept", 0);

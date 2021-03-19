@@ -1,6 +1,7 @@
 /rabbitmq
 /librdkafka
 mini3
+mini-3
 *.log
 *.xml
 request*.json

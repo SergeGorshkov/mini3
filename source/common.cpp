@@ -1,6 +1,7 @@
 void logger(int type, char *s1, char *s2, int socket_fd)
 {
     int fd;
+    char buffer[1024];
     char *logbuffer = (char *)malloc(strlen(s1) + strlen(s2) + 1024);
     if(!logbuffer) out_of_memory(socket_fd);
 
@@ -10,11 +11,11 @@ void logger(int type, char *s1, char *s2, int socket_fd)
         (void)sprintf(logbuffer, "503 ERROR: %s: %s Errno=%d exiting pid=%d", s1, s2, errno, getpid());
         break;
     case FORBIDDEN:
-        (void)write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 185\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 271);
+        (void)write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 184\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 270);
         (void)sprintf(logbuffer, "403 FORBIDDEN: %s: %s", s1, s2);
         break;
     case NOTFOUND:
-        (void)write(socket_fd, "HTTP/1.1 404 Not Found\nContent-Length: 136\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>404 Not Found</title>\n</head><body>\n<h1>Not Found</h1>\nThe requested URL was not found on this server.\n</body></html>\n", 224);
+        (void)write(socket_fd, "HTTP/1.1 404 Not Found\nContent-Length: 135\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>404 Not Found</title>\n</head><body>\n<h1>Not Found</h1>\nThe requested URL was not found on this server.\n</body></html>\n", 223);
         (void)sprintf(logbuffer, "404 NOT FOUND: %s: %s", s1, s2);
         break;
     case LOG:
@@ -26,15 +27,11 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     }
 #ifndef WEBSERVER
     printf("%s\n", logbuffer);
-#endif
-    char buffer[1024];
-#ifdef WEBSERVER
     if (type == ERROR)
     {
         int len = strlen(logbuffer);
         (void)sprintf(buffer, "HTTP/1.1 503 %s\nServer: mini3/%d.0\nConnection: close\nContent-Type: text/plain\n\n", logbuffer, VERSION); // Header + a blank line
         (void)write(socket_fd, buffer, strlen(buffer));
-        close(socket_fd);
     }
 #endif
     time_t rt;
@@ -42,7 +39,7 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     tm *t = localtime(&rt);
     strftime(buffer, 80, "%F %T\t", t);
     sem_wait(lsem);
-    if ((fd = open("mini3.log", O_CREAT | O_WRONLY | O_APPEND, 0644)) >= 0)
+    if ((fd = open("mini-3.log", O_CREAT | O_WRONLY | O_APPEND, 0644)) >= 0)
     {
         (void)write(fd, buffer, strlen(buffer));
         (void)write(fd, logbuffer, strlen(logbuffer));
@@ -51,8 +48,10 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     }
     sem_post(lsem);
     free(logbuffer);
-    if (type == ERROR || type == NOTFOUND || type == FORBIDDEN)
-        exit(0);
+    if (type == ERROR || type == NOTFOUND || type == FORBIDDEN) {
+	close(socket_fd);
+        exit(1);
+    }
 }
 
 char *file_get_contents(char *filename)
