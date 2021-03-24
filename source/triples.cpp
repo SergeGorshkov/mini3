@@ -60,6 +60,7 @@ logger(LOG, "hash", "", idx[r-1].mini_hash); */
         // Цель этого цикла - найти либо равный элемент, либо такой, который больше, но перед ним стоит тот, который меньше
         unsigned long m = ((l + r) >> 1);
         /* sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, mini_hash = %020lu (%lx, %lx)", m, l, r, idx[m].mini_hash, mini_hash, idx[m].mini_hash, mini_hash);
+        printf("%s\n", message);
         logger(LOG, message, "", 0); */
         // Если мы стоим у левой границы массива, то простая вилка: если первый элемент меньше, то перед ним, если больше, то после него
         if (m == offset)
@@ -224,7 +225,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                     ind++;
                     continue;
                 }
-                if(!triples[s_index[ind].index].s_pos) break;
+//                if(!triples[s_index[ind].index].s_pos) break;
                 char *s = get_string(triples[s_index[ind].index].s_pos);
                 if(!s) break;
                 if (strcmp(s, subject) != 0)
