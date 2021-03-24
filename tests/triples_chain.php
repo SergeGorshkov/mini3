@@ -79,7 +79,26 @@ $res = request( 'PUT', 'triple', $req );
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
+
+$req = [    'RequestId' => '3',
+	    'Chain' => [
+                [ '?lang', 'rdf:type', 'Language' ],
+                [ '?lang', 'isKnownBy', '?person' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?person', 'notexists', '' ],
+        	],
+            ]
+            ];
+
+echo("3. GET chain\n");
+$st = microtime(true);
+$res = request('GET', 'chain', $req );
+print_r($res);
 exit;
+
 $req = [    'RequestId' => '3',
 	    'Chain' => [
                 [ 'Jack', 'knows', '?lang' ],

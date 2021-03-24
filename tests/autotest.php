@@ -15,10 +15,11 @@ function request( $method, $endpoint, $query ) {
 
 $req = [    'RequestId' => '6',
             'Pattern' => [
-                [ 'http://localhost/knows', '*', '*' ]
+                [ 'http://localhost/Some', 'rdfs:label', 'some', 'xsd:string', 'EN' ],
+                [ 'http://localhost/Other', 'rdfs:label', 'other' ]
             ]
             ];
-$res = request( 'GET', 'triple', $req );
+$res = request( 'PUT', 'triple', $req );
 print_r($res);
 exit;
 

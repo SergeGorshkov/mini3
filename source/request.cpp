@@ -70,6 +70,7 @@ public:
             // This item is a collection or an array
             if(tokens[i].type == 1 || tokens[i].type == 2) {
                 *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, current_level, &pos, &status);
+                lang[0] = 0;
                 if (status == -1)
                     goto send_parse_error;
                 if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN || in_block == B_ORDER || in_block == B_FILTER)) {
@@ -236,6 +237,7 @@ public:
 //printf("  set current_level to %i (%i items at this level)\n", current_level, nested_array_items[current_level]);
                     if(end_of_block) {
                         *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, prev_level, &pos, &status);
+                        lang[0] = 0;
                         if (status == -1)
                             goto send_parse_error;
                     }
@@ -371,7 +373,14 @@ public:
     char *make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status)
     {
         char *message;
-//printf("Resolve %s - %s - %s\n", *subject, *predicate, *object);
+//printf("Make triple %s - %s - %s - %s - %s\n", *subject, *predicate, *object, *datatype, lang);
+        if( strcmp(*subject, "*") == 0 || strcmp(*subject, "*") == 0 ) {
+            message = (char *)malloc(128);
+            if(!message) out_of_memory();
+            sprintf(message, "You cannot use * as a subject or predicate");
+            *status = -1;
+            return message;
+        }
         if (resolve_prefixes_in_triple(subject, predicate, object, datatype, &message) == -1) {
             *status = -1;
             return message;
@@ -552,6 +561,17 @@ public:
             this->_filters[this->_n_filters].operation = COMPARE_MOREOREQUAL;
         else if(strcmp(predicate, "lessorequal") == 0)
             this->_filters[this->_n_filters].operation = COMPARE_LESSOREQUAL;
+        else if(strcmp(predicate, "exists") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_EXISTS;
+        else if(strcmp(predicate, "notexists") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_NOTEXISTS;
+        else {
+            message = (char *)malloc(128);
+            if(!message) out_of_memory();
+            sprintf(message, "Unknown filter operation: %s", predicate);
+            *status = -1;
+            return message;
+        }
         strcpy(this->_filters[this->_n_filters].value, object);
         this->_filters[this->_n_filters].group = (current_level > 0 ? this->current_filter_group[current_level - 1] : -1);
         this->_n_filters++;
@@ -1012,12 +1032,18 @@ public:
     }
 
     // Fill candidate objects (values) array for j-th variable using its linkage from i-th variable
-    void get_candidates(int i, int j, char *subject, char *predicate, char *object)
+    bool get_candidates(int i, int j, char *subject, char *predicate, char *object, bool negative)
     {
         unsigned long n = 0;
 //printf("Find %s - %s - %s\n", subject, predicate, object);
         unsigned long *res = find_matching_triples(subject, predicate, object, NULL, NULL, &n);
 //printf("found %i items\n", n);
+        if( negative ) {
+            free(res);
+            if( n > 0 )
+                return false;
+            return true;
+        }
         for (unsigned long k = 0; k < n; k++)
         {
             if (subject[0] == '*')
@@ -1028,6 +1054,8 @@ public:
                 add_candidate(this->var[i].cond_o[j], get_string(triples[res[k]].o_pos), subject, predicate, triples[res[k]].d_pos ? get_string(triples[res[k]].d_pos) : NULL, triples[res[k]].l);
         }
         free(res);
+        if( n > 0 ) return true;
+        return false;
     }
 
     // Recursively build single combination (single row of response)
@@ -1044,6 +1072,7 @@ public:
         // Cycle through all candidate objects
         for (int j = 0; j < this->var[i].n_cand; j++)
         {
+            if (!this->var[i].cand[j]) continue;
             if (ref_by_p != -1)
             {
                 if (strcmp(this->var[ref_by_p].obj, this->var[i].cand_p[j]) != 0)
@@ -1058,15 +1087,19 @@ public:
             comb_value_type[n_comb - 1] = this->var[i].cand_d[j];
             comb_value_lang[n_comb - 1] = this->var[i].cand_l[j];
             // Cycle through all references from this variable to others
+            int nref = 0;
             for (int k = 0; k < this->var[i].n; k++)
             {
                 // Predicate is a variable
                 if (this->var[this->var[i].cond_p[k]].obj[0] == '?')
                     continue;
-                build_combination(this->var[i].cond_o[k], this->var[i].cond_p[k], this->var[i].cand[j]);
+                if (this->var[this->var[i].cond_o[k]].obj[0] == '?') {
+                    nref++;
+                    build_combination(this->var[i].cond_o[k], this->var[i].cond_p[k], this->var[i].cand[j]);
+                }
             }
             // If there is no further conditions on this variable, i.e. it is the end of branch
-            if (this->var[i].n == 0)
+            if (nref == 0)
             {
                 if (this->n_pcv == 0) {
                     this->pre_comb_value = (char ***)malloc(1024 * sizeof(char **));
@@ -1093,8 +1126,10 @@ public:
                     this->pre_comb_value[this->n_pcv][comb_var[l]] = comb_value[l];
                     if(comb_value_type[l])
                         this->pre_comb_value_type[this->n_pcv][comb_var[l]] = comb_value_type[l];
-                    if(comb_value_lang[l][0])
-                        this->pre_comb_value_lang[this->n_pcv][comb_var[l]] = comb_value_lang[l];
+                    if(comb_value_lang[l]) {
+                        if(comb_value_lang[l][0])
+                            this->pre_comb_value_lang[this->n_pcv][comb_var[l]] = comb_value_lang[l];
+                    }
                 }
                 this->n_pcv++;
             }
@@ -1147,6 +1182,11 @@ public:
         {
             if (this->var[i].dep > max_dep)
                 max_dep = this->var[i].dep;
+                // Along with that, mark variables that must not exist
+                for(int j = 0; j < this->_n_filters; j++) {
+                    if(this->_filters[j].operation == COMPARE_NOTEXISTS && strcmp(this->_filters[j].variable, this->var[i].obj) == 0)
+                        this->var[i].notexists = true;
+                }
         }
         // Build an array with the variables processing order
         for (int i = 0; i <= max_dep; i++)
@@ -1167,15 +1207,35 @@ public:
             {
                 char *predicate = this->var[this->var[i].cond_p[j]].obj;
                 char *object = this->var[this->var[i].cond_o[j]].obj;
-                if (this->var[i].obj[0] == '?' && this->var[i].n_cand)
+                if (subject[0] == '?' && this->var[i].n_cand)
                 {
-                    for (int l = 0; l < this->var[i].n_cand; l++)
-                        get_candidates(i, j, this->var[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                    for (int l = 0; l < this->var[i].n_cand; l++) {
+//printf("case 1: %s - %s - %s\n", this->var[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                        bool match = get_candidates(i, j, this->var[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[this->var[i].cond_o[j]].notexists);
+//printf("got %d for %s, notex is %d\n", match, this->var[this->var[i].cond_o[j]].obj, this->var[this->var[i].cond_o[j]].notexists);
+                        if( this->var[this->var[i].cond_o[j]].notexists && !match ) {
+                            this->var[i].cand[l] = NULL;
+                        }
+                    }
                 }
-                else
-                    get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                else {
+//printf("case 2: %s - %s - %s\n", subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object);
+                    bool match = get_candidates(i, j, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists);
+                }
             }
         }
+    // Remove references to non-existant variables
+    for (int i = 0; i < n; i++) {
+        for(int j=0; j<this->var[i].n; j++) {
+            if (this->var[this->var[i].cond_p[j]].notexists || this->var[this->var[i].cond_o[j]].notexists) {
+                if (j < this->var[i].n-1) {
+                    memmove(&this->var[i].cond_p[j], &this->var[i].cond_p[j+1], sizeof(int)*(this->var[i].n - j));
+                    memmove(&this->var[i].cond_o[j], &this->var[i].cond_o[j+1], sizeof(int)*(this->var[i].n - j));
+                }
+                this->var[i].n --;
+            }
+        }
+    }
 /*
 printf("Variables:\n");
 for(int x=0; x<n; x++) {
@@ -1188,6 +1248,7 @@ for(int x=0; x<n; x++) {
     if(!this->var[i].n_cand) continue;
     printf("\tCandidates:\n");
     for(int j=0; j<this->var[i].n_cand; j++) {
+        if(!this->var[i].cand[j]) continue;
         printf("\t\t%s", this->var[i].cand[j]);
         if(this->var[i].cand_s[j])
             printf("\t(%s -> %s)", this->var[i].cand_s[j], this->var[i].cand_p[j]);
@@ -1209,12 +1270,19 @@ for(int i=0; i<this->_n_filters; i++) {
         for (int x = 0; x < n; x++)
         {
             int i = order[x];
-            if (this->var[i].obj[0] != '?' || this->var[i].n_cand == 0)
+            if (this->var[i].obj[0] != '?' || this->var[i].n_cand == 0 || this->var[i].notexists)
                 continue;
             // Cycle through candidates and build combination starting with each of them
             n_comb = 0;
             build_combination(i, -1, NULL);
             break;
+        }
+        for (int i = 0; i < n; i++) {
+            free(this->var[i].cand);
+            free(this->var[i].cand_s);
+            free(this->var[i].cand_p);
+            free(this->var[i].cand_d);
+            free(this->var[i].cand_l);
         }
 
         // Cycle through incomplete combinations to make complete ones
@@ -1330,6 +1398,13 @@ for(int i=0; i<this->_n_filters; i++) {
                     case COMPARE_NOTCONTAINS:
                         if(!strstr(lvalue, rvalue))
                             result = true;
+                        break;
+                    case COMPARE_EXISTS:
+                        if(lvalue[0])
+                            result = true;
+                        break;
+                    case COMPARE_NOTEXISTS:
+                        result = true;
                         break;
                     case COMPARE_EQUAL:
                     case COMPARE_NOTEQUAL:
@@ -1467,6 +1542,8 @@ for(int i=0; i<this->_n_filters; i++) {
             bool complete = true;
             for (int x = 0; x < n; x++) {
                 int i = order[x];
+                if (this->var[i].notexists)
+                    continue;
                 if (this->var[i].obj[0] != '?')
                     continue;
                 if (this->pre_comb_value[z][i] == NULL) {
@@ -1560,6 +1637,8 @@ for(int i=0; i<this->_n_filters; i++) {
         for (int x = 0; x < n; x++)
         {
             int i = order[x];
+            if (this->var[i].notexists)
+                continue;
             if (this->var[i].obj[0] != '?')
                 continue;
             if (!first)
@@ -1579,6 +1658,8 @@ for(int i=0; i<this->_n_filters; i++) {
             strcat(result, " [");
             for (int x = 0; x < n; x++) {
                 int i = order[x];
+                if (this->var[i].notexists)
+                    continue;
                 if (this->var[i].obj[0] != '?')
                     continue;
 //printf("%s\t", this->pre_comb_value[z][i]);

@@ -53,6 +53,8 @@
 #define COMPARE_MOREOREQUAL 6
 #define COMPARE_LESS 7
 #define COMPARE_LESSOREQUAL 8
+#define COMPARE_EXISTS 9
+#define COMPARE_NOTEXISTS 10
 
 #define PREFIXES_FILE "prefixes.bin"
 #define STAT_FILE "stat.bin"
@@ -140,6 +142,8 @@ struct chain_variable
     int n;          // number of conditions
     int cond_p[32]; // reference to other variables (predicate)
     int cond_o[32]; // reference to other variables (object)
+    bool notexists;
+    bool optional;
 
     int n_cand;     // number of candidates
     char **cand;    // id of candidate of this variable's value
