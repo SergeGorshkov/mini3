@@ -9,5 +9,7 @@ prefixes.json
 /database*
 autotest2.php
 chain.php
+git_back
+start.sh
+nohup.out
 config.our
-
