@@ -45,11 +45,11 @@ long _find_using_index(mini_index *idx, unsigned long *n, unsigned long mini_has
     *pos = offset;
     if (n == 0)
         return -1;
-    char message[1024];
-/* sprintf(message, "Chunk = %lu, offset = %lu, size = %lu, bits = %i", *chunk, offset, local_n, chunk_bits);
-printf("%s\n", message);
-logger(LOG, message, "", 0);
-logger(LOG, "hash", "", idx[r-1].mini_hash); */
+/*    char message[1024];
+ logger(LOG, "", "", 0);
+ sprintf(message, "Chunk = %lu, offset = %lu, size = %lu, bits = %i, hash = %020lu", *chunk, offset, local_n, chunk_bits, mini_hash);
+//printf("%s\n", message);
+logger(LOG, message, "", 0); */
     if (n[*chunk] == 0)
     {
         *pos = (*chunk) * CHUNK_SIZE;
@@ -59,8 +59,8 @@ logger(LOG, "hash", "", idx[r-1].mini_hash); */
     {
         // Цель этого цикла - найти либо равный элемент, либо такой, который больше, но перед ним стоит тот, который меньше
         unsigned long m = ((l + r) >> 1);
-        /* sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, mini_hash = %020lu (%lx, %lx)", m, l, r, idx[m].mini_hash, mini_hash, idx[m].mini_hash, mini_hash);
-        printf("%s\n", message);
+/*         sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, mini_hash = %020lu (%lx, %lx)", m, l, r, idx[m].mini_hash, mini_hash, idx[m].mini_hash, mini_hash);
+//        printf("%s\n", message);
         logger(LOG, message, "", 0); */
         // Если мы стоим у левой границы массива, то простая вилка: если первый элемент меньше, то перед ним, если больше, то после него
         if (m == offset)
@@ -83,10 +83,14 @@ logger(LOG, "hash", "", idx[r-1].mini_hash); */
                 *pos = m + 1;
                 return -1;
             }
-            else if (idx[m].mini_hash == mini_hash)
+            else if (idx[m].mini_hash == mini_hash) {
+                *pos = m + 1;
                 return m;
-            else if (idx[m - 1].mini_hash == mini_hash)
+            }
+            else if (idx[m - 1].mini_hash == mini_hash) {
+                *pos = m;
                 return m - 1;
+            }
             else if (idx[m - 1].mini_hash < mini_hash)
             {
                 *pos = m;
@@ -182,6 +186,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
 {
     unsigned char hash[SHA_DIGEST_LENGTH];
     long ind;
+//printf("search for %s - %s - %s\n", subject, predicate, object);
     unsigned long mini_hash, pos = 0, chunk = 0, size = 1024, *cand = (unsigned long *)malloc(sizeof(unsigned long *) * size);
     if(!cand) out_of_memory();
     if (subject[0] != '*' && predicate[0] != '*' && object[0] != '*')
@@ -213,21 +218,30 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     else if (subject[0] != '*')
     {
         mini_hash = get_mini_hash_char(subject);
+//printf("mini hash = %lx\n", mini_hash);
         ind = _find_using_index(s_index, s_chunks_size, mini_hash, &pos, &chunk);
+//printf("ind = %i, chunk = %i\n", ind, chunk);
         if (ind > -1)
         {
             while (ind > 0 && s_index[ind - 1].mini_hash == mini_hash)
                 ind--;
+//printf("rewind to %i\n", ind);
             while (ind < (*n_chunks) * CHUNK_SIZE && s_index[ind].mini_hash == mini_hash)
             {
+//printf("Check %i\n", ind);
                 if (triples[s_index[ind].index].status != 0)
                 {
                     ind++;
                     continue;
                 }
-//                if(!triples[s_index[ind].index].s_pos) break;
+//                if(!triples[s_index[ind].index].s_pos) { ind++; continue; }
                 char *s = get_string(triples[s_index[ind].index].s_pos);
-                if(!s) break;
+//printf("p = %s\n", get_string(triples[s_index[ind].index].p_pos));
+                if(!s)
+                {
+                    ind++;
+                    continue;
+                }
                 if (strcmp(s, subject) != 0)
                 {
                     ind++;
@@ -249,6 +263,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                         size += 1024;
                         cand = (unsigned long *)realloc(cand, size);
                     }
+//printf("push cand %i\n", ind);
                     cand[(*n)++] = s_index[ind].index;
                 }
                 ind++;

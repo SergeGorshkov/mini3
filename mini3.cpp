@@ -188,7 +188,7 @@ fprintf(fp, "\nDumping %lu s-index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
 	fprintf(fp, "Chunk (s) %lu, %lu items\n", c, s_chunks_size[c]);
 	for(int i=0; i<s_chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\n", s_index[c*CHUNK_SIZE + i].mini_hash, s_index[c*CHUNK_SIZE + i].index);
+		fprintf(fp, "%lx\t%lu\t%020lu\n", s_index[c*CHUNK_SIZE + i].mini_hash, s_index[c*CHUNK_SIZE + i].index, s_index[c*CHUNK_SIZE + i].mini_hash);
 }
 fprintf(fp, "\nDumping %lu p-index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {

@@ -227,7 +227,10 @@ unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chu
     unsigned long target_chunk = 0, pos = 0;
     unsigned long mini_hash = get_mini_hash_char(s);
     _find_using_index(index, f_chunks_size, mini_hash, &pos, &target_chunk);
-//logger(LOG, "insert_into_index", s, pos);
+/* char strl[1024];
+sprintf(strl, "%lx", mini_hash);
+logger(LOG, "insert_into_index", s, pos);
+logger(LOG, strl, "chunk", target_chunk); */
     // Если попадается много одинаковых идентификаторов в s, p или o, chunk может переполниться. В этом случае ищем соседний chunk
     if (f_chunks_size[target_chunk] == CHUNK_SIZE)
     {
