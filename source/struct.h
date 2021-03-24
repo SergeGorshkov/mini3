@@ -168,6 +168,7 @@ int sort_order = 0;
 
 char database_path[1024];
 char broker[1024], broker_host[1024], broker_port[1024], broker_user[1024], broker_password[1024], broker_queue[1024], broker_output_queue[1024];
+bool nodaemon = false;
 
 void logger(int type, char *s1, char *s2, int socket_fd);
 char *process_request(char *buffer, int operation, int endpoint, int modifier, int *pip);
@@ -189,6 +190,15 @@ void *mmap_file(int mode, char *file, size_t size)
         size = 1024;
     strcpy(fname, database_path);
     strcat(fname, file);
+    DIR *dir = opendir(database_path);
+    if(dir)
+        closedir(dir);
+    else {
+        if(mkdir(database_path, 0777) == -1) {
+            printf("Cannot open database directory %s: it does not exists or not enough access rights\n", database_path);
+            logger(ERROR, "Cannot open database directory: it does not exists or not enough access rights", database_path, 0);
+        }
+    }
     // Increase file size as required
     fd = open(fname, O_RDWR | O_CREAT);
     chmod(fname, 0666);

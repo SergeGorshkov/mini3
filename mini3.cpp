@@ -22,6 +22,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <openssl/sha.h>
+#include <dirent.h>
 #include <time.h>
 #include <limits.h>
 #include <netinet/in.h>
@@ -103,7 +104,6 @@ int main(int argc, char **argv)
 	printf("Started!\n\n");
 
 #if defined(WEBSERVER) || defined(LISTEN_QUEUES)
-	bool nodaemon = false;
 	if(argc == 3) {
 		if(strcmp(argv[2], "-n") == 0)
 			nodaemon = true;

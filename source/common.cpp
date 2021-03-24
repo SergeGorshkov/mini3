@@ -39,12 +39,16 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     tm *t = localtime(&rt);
     strftime(buffer, 80, "%F %T\t", t);
     sem_wait(lsem);
-    if ((fd = open("mini-3.log", O_CREAT | O_WRONLY | O_APPEND, 0644)) >= 0)
-    {
-        (void)write(fd, buffer, strlen(buffer));
-        (void)write(fd, logbuffer, strlen(logbuffer));
-        (void)write(fd, "\n", 1);
-        close(fd);
+    if(nodaemon)
+        printf("%s\n%s\n", buffer, logbuffer);
+    else {
+        if ((fd = open("mini-3.log", O_CREAT | O_WRONLY | O_APPEND, 0644)) >= 0)
+        {
+            (void)write(fd, buffer, strlen(buffer));
+            (void)write(fd, logbuffer, strlen(logbuffer));
+            (void)write(fd, "\n", 1);
+            close(fd);
+        }
     }
     sem_post(lsem);
     free(logbuffer);
