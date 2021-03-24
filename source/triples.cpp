@@ -1,5 +1,5 @@
 
-// Вычисляет целочисленный хэш по sha1-хэшу
+// Get an integer hash by sha1-hash
 unsigned long get_mini_hash(unsigned char *hash)
 {
     unsigned long mini_hash = 0;
@@ -10,7 +10,7 @@ unsigned long get_mini_hash(unsigned char *hash)
     return mini_hash;
 }
 
-// Вычисляет целочисленный хэш по произвольной строке
+// Get an integer hash by an arbitrary string
 unsigned long get_mini_hash_char(char *value)
 {
     unsigned long mini_hash = 0;
@@ -31,12 +31,13 @@ unsigned long get_mini_hash_char(char *value)
     return mini_hash;
 }
 
-// Внутренняя функция для бинарного поиска
+// Internal binary search method
+// Return an index of the element with mini_hash hash in the *triples array, -1 if not found
+// Use an array of indexes *idx, in which an ->index field contains an index of the element in the indexed array
+// In any case returns in the *pos parameter the index position, in which a new element with mini_hash shall be inserted
+// *n is an array of chunks size, *chunk is a chunk index in *idx array (return parameter)
 long _find_using_index(mini_index *idx, unsigned long *n, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk)
 {
-    // Вернуть индекс элемента с хэшем mini_hash в массиве triples, иначе -1
-    // Использовать массив индексов idx, в котором поле index содержит индекс элемента в массиве arr
-    // В любом случае вернуть в pos позицию, в которую должен быть вставлен новый элемент
     *chunk = mini_hash >> (64 - chunk_bits);
     unsigned long offset = (*chunk) * CHUNK_SIZE;
     unsigned long l = offset;
@@ -57,12 +58,12 @@ logger(LOG, message, "", 0); */
     }
     while (true)
     {
-        // Цель этого цикла - найти либо равный элемент, либо такой, который больше, но перед ним стоит тот, который меньше
+        // The goal of this cycle is to find an index element equal to mini_hash, or the pair of elements between which it shall be placed
         unsigned long m = ((l + r) >> 1);
 /*         sprintf(message, "m = %lu, l = %lu, r = %lu, idx[m] = %020lu, mini_hash = %020lu (%lx, %lx)", m, l, r, idx[m].mini_hash, mini_hash, idx[m].mini_hash, mini_hash);
 //        printf("%s\n", message);
         logger(LOG, message, "", 0); */
-        // Если мы стоим у левой границы массива, то простая вилка: если первый элемент меньше, то перед ним, если больше, то после него
+        // If we stay at the left array boundary: if the first array element is less that mini_hash - insert before it, or after it otherwise
         if (m == offset)
         {
             if (idx[m].mini_hash > mini_hash)
@@ -75,7 +76,7 @@ logger(LOG, message, "", 0); */
                 return -1;
             }
         }
-        // Если мы у правой границы массива
+        // If we are at the right array boundary
         if (m == local_n - 1)
         {
             if (idx[m].mini_hash < mini_hash)
@@ -102,8 +103,8 @@ logger(LOG, message, "", 0); */
                 return -1;
             }
         }
-        // Здесь сразу рассматриваются два случая, 1) если текущий элемент равен искомому 2) если перед текущим элементом стоит элемент меньше, а сам он больше
-        // В любом из этих случаев нам нужно либо вставить этот элемент на найденную позицию, либо обозначить что мы нашли равный
+        // Two cases are considered here: 1) if the current element is equal to mini_hash, 2) if the element before current is less than mini_hash, and the current element is more than mini_hash
+	// In these cases we have to insert an element to the current position, or return the found element
         if (idx[m].mini_hash == mini_hash)
         {
             *pos = m;
@@ -114,7 +115,7 @@ logger(LOG, message, "", 0); */
             *pos = m;
             return -1;
         }
-        // Здесь уже простой сдвиг границ, т.к. мы ищем больший элемент, то если текущий меньше, то нужно искать в "правой", от текущей позиции, части массива
+        // Move borders: if mini_hash is more that the current element - look in the right part of the index
         if (idx[m].mini_hash < mini_hash)
         {
             if (l != m)
@@ -125,7 +126,7 @@ logger(LOG, message, "", 0); */
                 return -1;
             }
         }
-        // Если больше, но не подошло ни под одно из вышеописанных условий, то ищем в "левой" части массива
+        // Search in the left part otherwise
         if (idx[m].mini_hash > mini_hash)
         {
             if (r != m)
@@ -140,7 +141,7 @@ logger(LOG, message, "", 0); */
     return -1;
 }
 
-// Внешняя функция для поиска элемента, которая после бинарного поиска по целочисленному хэшу проверяет совпадение полного хэша
+// An index search function for the external use. After performing binary search by integer hash it checks if the full hash matches
 long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk)
 {
     sem_wait(sem);
@@ -148,13 +149,13 @@ long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, un
     sem_post(sem);
     if (ind != -1)
     {
-        // Точно совпадающий элемент
+        // If an element exactly match
         if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0)
         {
             //logger(LOG, "Post-processing: element hash match", "", idx[ ind ].index);
             return ind;
         }
-        // Если целочисленные хэши справа или слева совпадают - проверяем совпадение полных хэшей
+        // If the integer hashes at left an right matches - compare full hashes
         else
         {
             //logger(LOG, "Post-processing: element hash NOT match", "", idx[ ind ].index);
@@ -182,6 +183,7 @@ long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, un
     return ind;
 }
 
+// Finds triples matching to the pattern passed. Returns an array of candidate triples and writes its size to *n parameter
 unsigned long *find_matching_triples(char *subject, char *predicate, char *object, char *datatype, char *lang, unsigned long *n)
 {
     unsigned char hash[SHA_DIGEST_LENGTH];
@@ -218,17 +220,13 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     else if (subject[0] != '*')
     {
         mini_hash = get_mini_hash_char(subject);
-//printf("mini hash = %lx\n", mini_hash);
         ind = _find_using_index(s_index, s_chunks_size, mini_hash, &pos, &chunk);
-//printf("ind = %i, chunk = %i\n", ind, chunk);
         if (ind > -1)
         {
             while (ind > 0 && s_index[ind - 1].mini_hash == mini_hash)
                 ind--;
-//printf("rewind to %i\n", ind);
             while (ind < (*n_chunks) * CHUNK_SIZE && s_index[ind].mini_hash == mini_hash)
             {
-//printf("Check %i\n", ind);
                 if (triples[s_index[ind].index].status != 0)
                 {
                     ind++;
@@ -236,7 +234,6 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                 }
 //                if(!triples[s_index[ind].index].s_pos) { ind++; continue; }
                 char *s = get_string(triples[s_index[ind].index].s_pos);
-//printf("p = %s\n", get_string(triples[s_index[ind].index].p_pos));
                 if(!s)
                 {
                     ind++;
@@ -263,7 +260,6 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                         size += 1024;
                         cand = (unsigned long *)realloc(cand, size);
                     }
-//printf("push cand %i\n", ind);
                     cand[(*n)++] = s_index[ind].index;
                 }
                 ind++;

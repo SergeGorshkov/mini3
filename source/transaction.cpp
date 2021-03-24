@@ -65,35 +65,30 @@ void read_from_pipe(int pip, local_triple *t)
     if(!t->s) out_of_memory();
     read(pip, t->s, a);
     t->s[a] = 0;
-    //logger(LOG, "Read s", t->s, a);
     read(pip, &a, sizeof(int));
     t->p = (char *)malloc(a + 1);
     if(!t->p) out_of_memory();
     read(pip, t->p, a);
     t->p[a] = 0;
-    //logger(LOG, "Read p", t->p, a);
     read(pip, &a, sizeof(int));
     t->o = (char *)malloc(a + 1);
     if(!t->o) out_of_memory();
     read(pip, t->o, a);
     t->o[a] = 0;
-    //logger(LOG, "Read o", t->o, a);
     read(pip, &a, sizeof(int));
     if (a) {
         t->d = (char *)malloc(a + 1);
         if(!t->d) out_of_memory();
         read(pip, t->d, a);
         t->d[a] = 0;
-        //logger(LOG, "Read d", t->d, a);
     }
     else
         t->d = NULL;
     read(pip, t->l, 8);
-    //logger(LOG, "l", t->l, 8);
     sem_post(rsem);
 }
 
-// Расширяет массив триплетов при необходимости
+// Expands array of triples if necessary
 void realloc_triples(int mode)
 {
     //logger(LOG, "Start realloc", "", (*allocated)*sizeof(triple));
@@ -142,7 +137,7 @@ logger(LOG, "\n", "", 0); */
         for (int j = 0; j < size[i]; j++)
         {
             unsigned long target = tmp[i * CHUNK_SIZE + j].mini_hash >> (64 - chunk_bits - 1);
-            // Записи после этой границы - во вторую половину нового chunk'а
+            // The records behind this point are going to the second part of the new chunk
             if (target == i * 2 + 1)
             {
                 if (j > 0)
@@ -159,7 +154,7 @@ logger(LOG, "\n", "", 0); */
                 break;
             }
         }
-        // Если границы в этом chunk'е нет
+        // If there is no boundary in this chunk
         if (!moved && size[i] > 0)
         {
             memcpy((void *)((unsigned long)newindex + (i * 2 * CHUNK_SIZE) * sizeof(mini_index)), (void *)((unsigned long)tmp + i * CHUNK_SIZE * sizeof(mini_index)), size[i] * sizeof(mini_index));
@@ -213,7 +208,6 @@ void rebuild_chunks(void)
     chunk_bits++;
     for (int i = 0; i < (*n_chunks); i++)
     {
-//logger(LOG, "Check chunk", "", i);
         if (check_chunk_size(full_index, chunks_size[i], i) || check_chunk_size(s_index, s_chunks_size[i], i) || check_chunk_size(p_index, p_chunks_size[i], i) || check_chunk_size(o_index, o_chunks_size[i], i))
         {
             rebuild_chunks();
@@ -231,7 +225,7 @@ unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chu
 sprintf(strl, "%lx", mini_hash);
 logger(LOG, "insert_into_index", s, pos);
 logger(LOG, strl, "chunk", target_chunk); */
-    // Если попадается много одинаковых идентификаторов в s, p или o, chunk может переполниться. В этом случае ищем соседний chunk
+    // If there are many similar identifiers in S, P or O index, a chunk may overflow. In this case we use a neighboring chunk
     if (f_chunks_size[target_chunk] == CHUNK_SIZE)
     {
         bool found = false;
@@ -287,10 +281,10 @@ logger(LOG, "(parent) Global commit", message, *n_triples);
 sprintf(message,"(parent) Triple %s with hash %lx has ind %i, pos %lu in chunk %lu", t->o, t->mini_hash, ind, pos, target_chunk);
 logger(LOG, message, "", 0);
 */
-    // Если такой триплет уже есть - пропускаем
+    // If this triple already exists - skip it
     if (ind > -1)
     {
-        // Если он удален - восстанавливаем
+        // Restore triple if it is deleted
         if (triples[full_index[ind].index].status == STATUS_DELETED)
         {
             sem_wait(sem);
@@ -308,7 +302,6 @@ logger(LOG, message, "", 0);
         sem_post(sem);
         realloc_triples(O_RDWR);
         sem_wait(sem);
-        //logger(LOG, "(parent) After realloc", "", getpid());
     }
     memcpy(&triples[*n_triples], t, sizeof(indexable));
     memcpy(&triples[*n_triples].l, t->l, 8);
@@ -336,11 +329,11 @@ logger(LOG, message, "", 0);
     chunks_size[target_chunk]++;
     full_index[pos].index = *n_triples;
     full_index[pos].mini_hash = t->mini_hash;
-    // Индекс по s
+    // S-index
     unsigned long s_target_chunk = insert_into_index(t->s, s_index, s_chunks_size);
-    // Индекс по p
+    // P-index
     unsigned long p_target_chunk = insert_into_index(t->p, p_index, p_chunks_size);
-    // Индекс по o
+    // O-index
     unsigned long o_target_chunk = insert_into_index(t->o, o_index, o_chunks_size);
     (*n_triples)++;
     if (chunks_size[target_chunk] == CHUNK_SIZE || s_chunks_size[s_target_chunk] == CHUNK_SIZE || p_chunks_size[p_target_chunk] == CHUNK_SIZE || o_chunks_size[o_target_chunk] == CHUNK_SIZE)
@@ -380,7 +373,7 @@ char *get_string(unsigned long pos)
     return (char *)((unsigned long)stringtable + pos + sizeof(unsigned long) * 2);
 }
 
-// s - строка, n - номер триплета, к которому она относится
+// s is a string, n is an index of triple to which it belongs
 unsigned long add_string(char *s, unsigned long n)
 {
     unsigned long len = strlen(s), pos = (*string_length);
