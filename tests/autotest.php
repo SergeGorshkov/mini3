@@ -13,6 +13,15 @@ function request( $method, $endpoint, $query ) {
     return json_decode( $response );
 }
 
+$req = [    'RequestId' => '6',
+            'Pattern' => [
+                [ 'http://localhost/knows', '*', '*' ]
+            ]
+            ];
+$res = request( 'GET', 'triple', $req );
+print_r($res);
+exit;
+
 // Send prefixes
 echo("1. PUT prefixes:\t\t\t");
 $req = [ 'RequestId' => '1',

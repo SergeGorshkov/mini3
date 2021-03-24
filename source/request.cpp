@@ -913,7 +913,7 @@ public:
         for (int i = 0; i < this->_n_send; i++) {
             char ans[1024 * 10];
             sprintf(ans, "[\"%s\", \"%s\", \"%s\"", get_string(triples[this->_to_send[i]].s_pos), get_string(triples[this->_to_send[i]].p_pos), get_string(triples[this->_to_send[i]].o_pos));
-            if (triples[this->_to_send[i]].d_len || triples[this->_to_send[i]].l[0]) {
+            if (triples[this->_to_send[i]].d_len) {
                 char *dt = get_string(triples[this->_to_send[i]].d_pos);
                 if (dt)
                     sprintf((char *)((unsigned long)ans + strlen(ans)), ", \"%s\"", dt);
