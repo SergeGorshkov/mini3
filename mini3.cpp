@@ -94,6 +94,10 @@ int main(int argc, char **argv)
 					 "\t-n means that the servel shall not become a daemon. It will not return to the console until stopped.\n\n");
 		exit(0);
 	}
+	if(argc == 3) {
+		if(strcmp(argv[2], "-n") == 0)
+			nodaemon = true;
+	}
 	start_web_server(argc, argv);
 #endif
 #ifdef LISTEN_QUEUES
@@ -103,10 +107,6 @@ int main(int argc, char **argv)
 	printf("Started!\n\n");
 
 #if defined(WEBSERVER) || defined(LISTEN_QUEUES)
-	if(argc == 3) {
-		if(strcmp(argv[2], "-n") == 0)
-			nodaemon = true;
-	}
 	if(!nodaemon) {
 		// Since this point works only the child process which listens pipe and performs transactions
 		if (fork() != 0)
