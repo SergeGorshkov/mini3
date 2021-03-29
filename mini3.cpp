@@ -103,7 +103,6 @@ int main(int argc, char **argv)
 	printf("Started!\n\n");
 
 #if defined(WEBSERVER) || defined(LISTEN_QUEUES)
-	bool nodaemon = false;
 	if(argc == 3) {
 		if(strcmp(argv[2], "-n") == 0)
 			nodaemon = true;

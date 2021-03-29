@@ -46,6 +46,9 @@ void logger(int type, char *s1, char *s2, int socket_fd)
         (void)write(fd, "\n", 1);
         close(fd);
     }
+    if(nodaemon) {
+	printf("%s %s\n", buffer, logbuffer);
+    }
     sem_post(lsem);
     free(logbuffer);
     if ((type == ERROR || type == NOTFOUND || type == FORBIDDEN) && socket_fd > 0) {

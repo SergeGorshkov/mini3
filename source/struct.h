@@ -165,6 +165,7 @@ char *stringtable = NULL;
 sem_t *sem, *wsem, *rsem, *lsem, *psem;
 int global_web_pip[4];
 int sort_order = 0;
+bool nodaemon = false;
 
 char database_path[1024];
 char broker[1024], broker_host[1024], broker_port[1024], broker_user[1024], broker_password[1024], broker_queue[1024], broker_output_queue[1024];
