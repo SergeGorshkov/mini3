@@ -19,7 +19,7 @@
 #define LOG 44
 #define FORBIDDEN 403
 #define NOTFOUND 404
-#define VERSION 1
+#define VERSION "0.90"
 #define STATUS_DELETED 1
 
 #define N_MAX_PREFIX 64

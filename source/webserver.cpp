@@ -5,7 +5,7 @@ void web(int fd, int hit, int *pip)
 	int j, file_fd, buflen;
 	long i, ret, len;
 	char *fstr, *answer;
-	char *buffer;
+	char *buffer, *empty = "request= ";
 	int operation = 0, endpoint = 0, modifier = 0;
 
 	buffer = (char*)malloc(BUFSIZE*2 + 1);
@@ -73,15 +73,16 @@ void web(int fd, int hit, int *pip)
 		endpoint = EP_TRIPLE;
 	else if (strstr(buffer, "/chain") > 0)
 		endpoint = EP_CHAIN;
-	if (strstr(buffer, "/count") > 0) {
+	if (strstr(buffer, "/count") > 0)
 		modifier |= MOD_COUNT;
-	}
 	if (!endpoint)
 		logger(FORBIDDEN, "Endpoint is not specified", buffer, fd);
 
 	char *rp = (char *)malloc(strlen(buffer) + 1);
 	if(!rp) out_of_memory(fd);
 	char *req = strstr(buffer, "request=");
+	if(!req && endpoint == EP_PREFIX && operation == OP_GET)
+		req = empty;
 	if(!req)
 		logger(FORBIDDEN, "No request= parameter is given", "", fd);
 	strcpy(rp, (char *)((unsigned long)req + 8));
@@ -92,7 +93,7 @@ void web(int fd, int hit, int *pip)
 	logger(LOG, "Request", rp, hit);
 	char *response = process_request(rp, operation, endpoint, modifier, pip);
 	len = strlen(response);
-	(void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: mini3/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: application/json\n\n", VERSION, len); // Header + a blank line
+	(void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: mini-3/%s\nContent-Length: %ld\nConnection: close\nContent-Type: application/json\n\n", VERSION, len); // Header + a blank line
 																																							//	logger(LOG,"Header",buffer,hit);
 	logger(LOG, "Answer", response, hit);
 	(void)write(fd, buffer, strlen(buffer));
