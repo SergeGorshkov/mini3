@@ -190,7 +190,7 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
     long ind;
 //printf("search for %s - %s - %s\n", subject, predicate, object);
     unsigned long mini_hash, pos = 0, chunk = 0, size = 1024, *cand = (unsigned long *)malloc(sizeof(unsigned long *) * size);
-    if(!cand) out_of_memory();
+    if (!cand) out_of_memory();
     if (subject[0] != '*' && predicate[0] != '*' && object[0] != '*')
     {
         int datatype_len = 0;

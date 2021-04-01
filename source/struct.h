@@ -139,18 +139,34 @@ struct chain_variable
     int var;        // corresponding variable
     int dep;        // dependence score
 
+    // Conditions - relations to another variables
     int n;          // number of conditions
     int cond_p[32]; // reference to other variables (predicate)
     int cond_o[32]; // reference to other variables (object)
     bool notexists;
     bool optional;
 
+    // Candidate objects (values)
     int n_cand;     // number of candidates
     char **cand;    // id of candidate of this variable's value
     char **cand_s;  // subject leading to this candidate
     char **cand_p;  // linkage (predicate or object) leading from subject to this candidate
     char **cand_d;  // value's datatype
     char **cand_l;  // value's lang
+
+    // Dependent of variables
+    int n_dep_of;
+    int dependent_of[32];
+
+    // Solutions from this variable to dependent ones
+    int *solution[32]; // first index is the dependent variable index, value is its candidate object index
+    int *solution_cand[32]; // source candidate object index (of this variable's candidates)
+    int *bearer[32]; // for the predicate variables: bearer is the object which possess this predicate's value
+    int n_sol[32];  // number of solutions to each dependent variable
+
+    // Combinations from this variable to dependent ones
+    int n_comb;     // number of combinations
+    int **comb_value; // index of the candidate object of that variable
 };
 
 unsigned long *global_block_ul = NULL;
@@ -165,7 +181,6 @@ char *stringtable = NULL;
 sem_t *sem, *wsem, *rsem, *lsem, *psem;
 int global_web_pip[4];
 int sort_order = 0;
-bool nodaemon = false;
 
 char database_path[1024];
 char broker[1024], broker_host[1024], broker_port[1024], broker_user[1024], broker_password[1024], broker_queue[1024], broker_output_queue[1024];

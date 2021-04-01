@@ -134,13 +134,15 @@ if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
 
+/*
 $req = [    'RequestId' => '3',
 	    'Chain' => [
                 [ 'Jack', 'knows', '?lang' ],
                 [ '?lang', 'hasType', '?type' ],
                 [ '?type', 'rdfs:label', '?typename' ],
+                [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'rdfs:label', '?personname' ],
-                [ '?lang', 'isKnownBy', '?person' ],
+                [ '?lang', '?known', '?person' ],
             ],
             'Order' => [ [ '?person', 'desc' ],
         		 [ '?personname', 'asc' ]
@@ -164,6 +166,8 @@ $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
+print_r($res);
+exit;
 
 // Print table
 foreach($res->Vars as $rr) {
@@ -176,6 +180,7 @@ foreach($res->Result as $rr) {
     }
     echo("\n");
 }
+*/
 
 $tests = [
 
@@ -282,6 +287,7 @@ $tests = [
 
 echo("4. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
+if($ind!=0) continue;
 	echo($ind . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );

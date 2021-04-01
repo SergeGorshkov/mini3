@@ -1,5 +1,4 @@
 #pragma GCC diagnostic ignored "-Wwrite-strings"
-#define VERSION 1
 #define JSMN_PARENT_LINKS 1
 #define MULTITHREAD
 #define LISTEN_QUEUES
@@ -92,7 +91,7 @@ int main(int argc, char **argv)
 	{
 		(void)printf("Usage: mini-3 Port-Number [-n]\n\n"
 					 "\tExample: mini-3 8080\n"
-					 "\t-n means that the servel shall not become a daemon. It will not return to the console until stopped.\n\n");
+					 "\t-n means that the server shall not become a daemon. It will not return to the console until stopped.\n\n");
 		exit(0);
 	}
 	if(argc == 3) {
