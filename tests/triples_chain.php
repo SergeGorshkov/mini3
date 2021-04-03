@@ -287,7 +287,7 @@ $tests = [
 
 echo("4. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if($ind!=0) continue;
+if($ind!=4) continue;
 	echo($ind . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );

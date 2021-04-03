@@ -276,7 +276,7 @@ sprintf(message, "%lu", t->mini_hash);
 logger(LOG, "(parent) Global commit", message, *n_triples);
 */
     unsigned long target_chunk = 0;
-    long ind = find_using_index(full_index, chunks_size, t->hash, t->mini_hash, &pos, &target_chunk);
+    long ind = find_using_index(full_index, chunks_size, t->hash, t->mini_hash, &pos, &target_chunk, t->d, t->l);
 /*
 sprintf(message,"(parent) Triple %s with hash %lx has ind %i, pos %lu in chunk %lu", t->o, t->mini_hash, ind, pos, target_chunk);
 logger(LOG, message, "", 0);

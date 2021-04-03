@@ -4,6 +4,11 @@
         "typeinfo": "cpp",
         "cmath": "cpp",
         "system_error": "cpp",
-        "functional": "cpp"
+        "functional": "cpp",
+        "vector": "cpp",
+        "memory": "cpp",
+        "optional": "cpp",
+        "string_view": "cpp",
+        "thread": "cpp"
     }
 }

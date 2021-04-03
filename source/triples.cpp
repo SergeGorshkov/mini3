@@ -32,7 +32,7 @@ unsigned long get_mini_hash_char(char *value)
 }
 
 // Internal binary search method
-// Return an index of the element with mini_hash hash in the *triples array, -1 if not found
+// Return value is an index of the element with mini_hash hash in the *triples array, -1 if not found
 // Use an array of indexes *idx, in which an ->index field contains an index of the element in the indexed array
 // In any case returns in the *pos parameter the index position, in which a new element with mini_hash shall be inserted
 // *n is an array of chunks size, *chunk is a chunk index in *idx array (return parameter)
@@ -104,7 +104,7 @@ logger(LOG, message, "", 0); */
             }
         }
         // Two cases are considered here: 1) if the current element is equal to mini_hash, 2) if the element before current is less than mini_hash, and the current element is more than mini_hash
-	// In these cases we have to insert an element to the current position, or return the found element
+	    // In these cases we have to insert an element to the current position, or return the found element
         if (idx[m].mini_hash == mini_hash)
         {
             *pos = m;
@@ -142,43 +142,44 @@ logger(LOG, message, "", 0); */
 }
 
 // An index search function for the external use. After performing binary search by integer hash it checks if the full hash matches
-long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk)
+long find_using_index(mini_index *idx, unsigned long *n, unsigned char *hash, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk, char *datatype, char *lang)
 {
     sem_wait(sem);
     long ind = _find_using_index(idx, n, mini_hash, pos, chunk);
     sem_post(sem);
     if (ind != -1)
     {
-        // If an element exactly match
-        if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0)
+        while (ind > 0 && idx[ind - 1].mini_hash == mini_hash)
+            ind--;
+        // TODO: check neighboring chunks for the triples with the same hash
+        while (ind < (*chunk)*CHUNK_SIZE + n[*chunk] && idx[ind].mini_hash == mini_hash)
         {
-            //logger(LOG, "Post-processing: element hash match", "", idx[ ind ].index);
-            return ind;
-        }
-        // If the integer hashes at left an right matches - compare full hashes
-        else
-        {
-            //logger(LOG, "Post-processing: element hash NOT match", "", idx[ ind ].index);
-            if (ind > 0)
-            {
-                while (ind > 0 && idx[ind - 1].mini_hash == mini_hash)
-                {
-                    if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0)
-                        return ind - 1;
-                    ind--;
+            // TODO: check equality of the strings, not only hashes
+            if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0) {
+                if (datatype != NULL) {
+                    if (triples[idx[ind].index].d_pos) {
+                        char *dt = get_string(triples[idx[ind].index].d_pos);
+                        if (strcmp(dt, datatype) != 0) {
+                            ind++;
+                            continue;
+                        }
+                    }
+                    else {
+                        ind++;
+                        continue;
+                    }
                 }
-            }
-            if (ind < n[*chunk] - 1)
-            {
-                while (ind < n[*chunk] - 1 && idx[ind + 1].mini_hash == mini_hash)
-                {
-                    if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0)
-                        return ind + 1;
-                    ind++;
+                if (lang != NULL) {
+                    if (strcmp(triples[idx[ind].index].l, lang) != 0) {
+                        ind++;
+                        continue;
+                    }
                 }
+                return ind;
             }
-            return -1;
+            ind++;
         }
+        return -1;
     }
     return ind;
 }
@@ -198,14 +199,12 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
             datatype_len = strlen(datatype);
         char *data = (char*)malloc(strlen(subject) + strlen(predicate) + strlen(object) + datatype_len + 1024);
         if(!data) out_of_memory();
-        sprintf(data, "%s | %s | %s | %s", subject, predicate, object, lang);
-        if(datatype_len)
-            strcat(data, datatype);
+        sprintf(data, "%s | %s | %s", subject, predicate, object);
         memset(hash, 0, SHA_DIGEST_LENGTH);
         SHA1((unsigned char *)data, strlen(data), hash);
         mini_hash = get_mini_hash(hash);
         free(data);
-        ind = find_using_index(full_index, chunks_size, hash, mini_hash, &pos, &chunk);
+        ind = find_using_index(full_index, chunks_size, hash, mini_hash, &pos, &chunk, datatype, lang);
         if (ind == -1)
             return NULL;
         if (triples[full_index[ind].index].status != 0)
@@ -251,8 +250,17 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                     passed++;
                 if (object[0] == '*')
                     passed++;
-                else if (strcmp(object, get_string(triples[s_index[ind].index].o_pos)) == 0)
+                else if (strcmp(object, get_string(triples[s_index[ind].index].o_pos)) == 0) {
+                    if (datatype != NULL) {
+                        if (strcmp(datatype, get_string(triples[s_index[ind].index].d_pos)) != 0)
+                            passed--;
+                    }
+                    if (lang != NULL) {
+                        if (strcmp(lang, triples[s_index[ind].index].l) != 0)
+                            passed--;
+                    }
                     passed++;
+                }
                 if (passed == 2)
                 {
                     if ((*n) >= size)
@@ -338,8 +346,17 @@ unsigned long *find_matching_triples(char *subject, char *predicate, char *objec
                     passed++;
                 if (object[0] == '*')
                     passed++;
-                else if (strcmp(object, get_string(triples[p_index[ind].index].o_pos)) == 0)
+                else if (strcmp(object, get_string(triples[p_index[ind].index].o_pos)) == 0) {
+                    if (datatype != NULL) {
+                        if (strcmp(datatype, get_string(triples[s_index[ind].index].d_pos)) != 0)
+                            passed--;
+                    }
+                    if (lang != NULL) {
+                        if (strcmp(lang, triples[s_index[ind].index].l) != 0)
+                            passed--;
+                    }
                     passed++;
+                }
                 if (passed == 2)
                 {
                     if ((*n) >= size)
