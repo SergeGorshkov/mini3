@@ -41,6 +41,7 @@
 #define B_PREFIX 3
 #define B_ORDER 4
 #define B_FILTER 5
+#define B_OPTIONAL 6
 
 #define LOGIC_AND 0
 #define LOGIC_OR 1
@@ -143,8 +144,8 @@ struct chain_variable
     int n;          // number of conditions
     int cond_p[32]; // reference to other variables (predicate)
     int cond_o[32]; // reference to other variables (object)
-    bool notexists;
-    bool optional;
+    bool notexists; // there is filter condition indicating that this variable must have no values
+    bool optional;  // this variable may have no values
 
     // Candidate objects (values)
     int n_cand;     // number of candidates

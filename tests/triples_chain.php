@@ -41,7 +41,7 @@ $req = [    'RequestId' => '2',
 		[ 'Programmer', 'rdfs:subClassOf', 'Person' ],
 		[ 'Programmer', 'rdfs:label', 'Programmer', 'xsd:string' ],
 		[ 'Designer', 'rdf:type', 'owl:Class' ],
-		[ 'Designer', 'rdfs:subClassOf', 'Designer' ],
+		[ 'Designer', 'rdfs:subClassOf', 'Person' ],
 		[ 'Designer', 'rdfs:label', 'Designer', 'xsd:string' ],
 		[ 'LanguageType', 'rdf:type', 'owl:Class' ],
 		[ 'LanguageType', 'rdfs:label', 'Language type', 'xsd:string' ],
@@ -58,7 +58,7 @@ $req = [    'RequestId' => '2',
 		[ 'knows', 'rdfs:domain', 'Person' ],
 		[ 'knows', 'rdfs:range', 'Language' ],
 		[ 'isKnownBy', 'rdf:type', 'owl:ObjectProperty' ],
-		[ 'isKnownBy', 'rdfs:label', 'is known by' ],
+		[ 'isKnownBy', 'rdfs:label', 'is known by', 'xsd:string' ],
 		[ 'isKnownBy', 'rdfs:domain', 'Language' ],
 		[ 'isKnownBy', 'rdfs:range', 'Person' ],
 
@@ -72,18 +72,18 @@ $req = [    'RequestId' => '2',
 		[ 'Jack', 'rdf:type', 'Person' ],
 		[ 'Jack', 'rdf:type', 'Programmer' ],
 		[ 'Jack', 'rdf:type', 'owl:NamedIndividual' ],
-		[ 'Jack', 'yearOfBirth', '1979' ],
+		[ 'Jack', 'yearOfBirth', '1979', 'xsd:integer' ],
 		[ 'Jack', 'rdfs:label', 'Jack Doe', 'xsd:string', 'EN' ],
 		[ 'Jack', 'rdfs:label', 'Джек Доу', 'xsd:string', 'RU' ],
 		[ 'Jane', 'rdf:type', 'Person' ],
 		[ 'Jane', 'rdf:type', 'Programmer' ],
 		[ 'Jane', 'rdf:type', 'Designer' ],
-		[ 'Jack', 'yearOfBirth', '1985' ],
+		[ 'Jane', 'yearOfBirth', '1985', 'xsd:integer' ],
 		[ 'Jane', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jane', 'rdfs:label', 'Jane Doe', 'xsd:string', 'EN' ],
 		[ 'Jill', 'rdf:type', 'Person' ],
 		[ 'Jill', 'rdf:type', 'Designer' ],
-		[ 'Jill', 'yearOfBirth', '1990' ],
+		[ 'Jill', 'yearOfBirth', '1990', 'xsd:integer' ],
 		[ 'Jill', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jill', 'rdfs:label', 'Jill Doe', 'xsd:string', 'EN' ],
 		[ 'PHP', 'rdf:type', 'Language' ],
@@ -117,12 +117,12 @@ $req = [    'RequestId' => '2',
 		[ 'writtenOn', 'rdfs:label', 'is written on', 'xsd:string' ],
 
 		[ 'ABC', 'rdf:type', 'Project' ],
-		[ 'ABC', 'isWrittenOn', 'C++' ],
+		[ 'ABC', 'writtenOn', 'C++' ],
 		[ 'ABC', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jack', 'participatesIn', 'ABC' ],
 		[ 'Jane', 'participatesIn', 'ABC' ],
 		[ 'DEF', 'rdf:type', 'Project' ],
-		[ 'DEF', 'isWrittenIn', 'PHP' ],
+		[ 'DEF', 'writtenOn', 'PHP' ],
 		[ 'DEF', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jack', 'participatesIn', 'DEF' ]
             ]
@@ -134,7 +134,6 @@ if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
 
-/*
 $req = [    'RequestId' => '3',
 	    'Chain' => [
                 [ 'Jack', 'knows', '?lang' ],
@@ -166,8 +165,8 @@ $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
-print_r($res);
-exit;
+//print_r($res);
+//exit;
 
 // Print table
 foreach($res->Vars as $rr) {
@@ -180,7 +179,39 @@ foreach($res->Result as $rr) {
     }
     echo("\n");
 }
-*/
+
+$req = [    'RequestId' => '4',
+	    'Chain' => [
+                [ '?lang', 'rdf:type', 'Language' ],
+                [ '?lang', 'isKnownBy', '?person' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?person', 'notexists', '' ]
+        	]
+            ]
+            ];
+
+echo("\n4. GET chain with notexists filter\n");
+$st = microtime(true);
+$res = request('GET', 'chain', $req );
+$et = microtime(true);
+if($res->Status == 'Ok') echo("OK");
+else echo("ERROR!");
+echo(" ".round($et-$st,3)."\n");
+
+// Print table
+foreach($res->Vars as $rr) {
+    echo($rr."\t");
+}
+echo("\n");
+foreach($res->Result as $rr) {
+    foreach($rr as $r) {
+	echo($r[0]."\t");
+    }
+    echo("\n");
+}
 
 $tests = [
 
@@ -231,13 +262,19 @@ $tests = [
                 [ '?person2', 'knows', '?lang2' ],
                 [ '?lang1', 'hasType', '?type1' ],
                 [ '?lang2', 'hasType', '?type2' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?person1', 'notequal', '?person2' ]
+        	]
             ]
         ],
 
 	[   'RequestId' => '7',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
-                [ '?person', 'knows', '?lang' ],
+                [ '?person', 'knows', '?lang1' ],
                 [ '?project', 'rdf:type', 'Project' ],
                 [ '?project', 'writtenOn', '?lang2' ],
                 [ '?lang1', 'rdfs:label', '?name1' ],
@@ -254,7 +291,7 @@ $tests = [
 	[   'RequestId' => '8',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
-                [ '?person', 'knows', '?lang' ],
+                [ '?person', 'knows', '?lang1' ],
                 [ '?project', 'rdf:type', 'Project' ],
                 [ '?project', 'writtenOn', '?lang2' ],
                 [ '?lang1', 'rdfs:label', '?name1' ],
@@ -268,8 +305,8 @@ $tests = [
                 [ '?person', 'rdfs:label', '?name' ],
 		[ '?person', 'yearOfBirth', '?year' ],
                 [ '?person', 'knows', '?lang' ],
-                [ '?subclass', 'rdfs:subClassOf', 'Person' ],
                 [ '?lang', 'rdfs:label', '?namelang' ],
+                [ '?subclass', 'rdfs:subClassOf', 'Person' ],
                 [ '?person2', 'rdf:type', '?subclass' ],
                 [ '?person2', 'rdfs:label', '?name2' ],
 		[ '?person2', 'yearOfBirth', '?year2' ],
@@ -278,17 +315,17 @@ $tests = [
             'Filter' => [
         	'and',
         	[ 'and',
-        	    [ '?year1', 'more', '?year2' ]
+        	    [ '?year', 'more', '?year2' ]
         	]
             ]
         ],
 
 ];
 
-echo("4. Running complex tests\n");
+echo("\n5. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if($ind!=4) continue;
-	echo($ind . ". ");
+//if($ind!=7) continue;
+	echo("\n" . $ind . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );
 	$et = microtime(true);

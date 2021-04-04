@@ -8,21 +8,20 @@ function request( $method, $endpoint, $query ) {
             'content' => 'request=' . json_encode( $query ),
         ),
     ) );
-    $response = file_get_contents( "http://localhost:8088/" . $endpoint, false, $context );
+    $response = file_get_contents( "http://localhost:8082/" . $endpoint, false, $context );
 //echo("Return: ".$response."\n");
     return json_decode( $response );
 }
-
+/*
 $req = [    'RequestId' => '6',
             'Pattern' => [
-                [ 'http://localhost/Some', 'rdfs:label', 'some', 'xsd:string', 'EN' ],
-                [ 'http://localhost/Other', 'rdfs:label', 'other' ]
+                [ 'Jane', 'participatesIn', 'ABC' ],
             ]
             ];
-$res = request( 'PUT', 'triple', $req );
+$res = request( 'GET', 'triple', $req );
 print_r($res);
 exit;
-
+*/
 // Send prefixes
 echo("1. PUT prefixes:\t\t\t");
 $req = [ 'RequestId' => '1',

@@ -16,7 +16,8 @@ public:
 
     // Variables set for chain request
     chain_variable var[32];
-    int n_var = 0, depth = 0;
+    int n_var = 0, n_optional = 0, depth = 0;
+    char *optional[32];
 
     // Set of candidate combinations
     char ***pre_comb_value, ***pre_comb_value_type, ***pre_comb_value_lang;
@@ -135,6 +136,13 @@ public:
                     pos = 0;
                     continue;
                 }
+                if (strcmp(t, "optional") == 0)
+                {
+                    if (endpoint != EP_CHAIN)
+                        goto wrong_parameter;
+                    in_block = B_OPTIONAL;
+                    continue;
+                }
                 if (strcmp(t, "count") == 0)
                 {
                     if (endpoint != EP_TRIPLE && endpoint != EP_CHAIN)
@@ -175,6 +183,10 @@ public:
                     }
                     strcpy(this->type, t);
                     in_method = false;
+                }
+                else if (in_block == B_OPTIONAL) {
+                    this->optional[this->n_optional] = (char*)malloc(strlen(t) + 1);
+                    strcpy(this->optional[this->n_optional++], t);
                 }
                 else if (in_block == B_PATTERN || in_block == B_CHAIN || in_block == B_FILTER || in_block == B_PREFIX || in_block == B_ORDER)
                 {
@@ -983,26 +995,27 @@ public:
 
     // Check if possible candidate s has a triple with the given predicate and object
     bool check_candidate_match(char *s, char *predicate, int cond_o) {
-        bool match = true;
+        bool match = false;
         unsigned long n = 0, *cand;
         if (this->var[ cond_o ].obj[0] == '?') {
+            if (!this->var[ cond_o ].n_cand) return true; // Doubtful
             for (int k = 0; k < this->var[ cond_o ].n_cand; k++) {
 //printf("\tCheck (1) %s - %s - %s\n", s, predicate, this->var[ cond_o ].cand[k]);
-                cand = find_matching_triples(s, predicate, this->var[ cond_o ].cand[k], NULL, "", &n);
-                if (cand != NULL)
+                cand = find_matching_triples(s, predicate, this->var[ cond_o ].cand[k], NULL, NULL, &n);
+                if (cand != NULL) {
                     free(cand);
-                else
-                    match = false;
-                if(!match) break;
+                    match = true;
+                    break;
+                }
             }
         }
         else {
-            cand = find_matching_triples(s, predicate, this->var[ cond_o ].obj, NULL, "", &n);
-//printf("\tCheck (2) %s - %s - %s\n", s, predicate, this->var[ cond_o ].obj);
-            if (cand != NULL)
+            cand = find_matching_triples(s, predicate, this->var[ cond_o ].obj, NULL, NULL, &n);
+//printf("\tCheck (2) %s - %s - %s, %i, %x\n", s, predicate, this->var[ cond_o ].obj, n, cand);
+            if (cand != NULL) {
                 free(cand);
-            else
-                match = false;
+                match = true;
+            }
         }
         return match;
     }
@@ -1131,6 +1144,7 @@ public:
             }
             else if (object[0] == '*') {
                 int ind_cand = add_candidate(j, get_string(triples[res[k]].o_pos), triples[res[k]].d_pos ? get_string(triples[res[k]].d_pos) : NULL, triples[res[k]].l);
+//printf("add candidate %s to variable %s, ind_cand = %i\n", get_string(triples[res[k]].o_pos), this->var[j].obj, ind_cand);
                 if (i >= 0 && ind_cand > -1)
                     add_solution(i, j, cand_subject, ind_cand, bearer);
             }
@@ -1150,12 +1164,12 @@ public:
             this->var[i].comb_value = (int **)realloc(this->var[i].comb_value, (this->var[i].n_comb / 1024 + 1) * 1024 * sizeof(int *));
             if(!this->var[i].comb_value) out_of_memory();
         }
-        int size = 0;
+        /* int size = 0;
         for (int k = 0; k < 32; k++) {
             if (comb[k] != -1)
                 size++;
         }
-        if (size < 2) return;
+        if (size < 2) return; */
         // Check if this combination already exists
         for (int j = 0; j < this->var[i].n_comb; j++) {
             bool identical = true;
@@ -1318,6 +1332,13 @@ public:
                     this->var[ico].dep++;
             }
         }
+        // Mark optional variables
+        for (int i = 0; i < this->n_optional; i++) {
+            for (int j = 0; j < this->n_var; j++) {
+                if (strcmp(this->optional[i], this->var[j].obj) == 0)
+                    this->var[j].optional = true;
+            }
+        }
         // Find variables dependence to define the variables resolution order
         for (int i = 0; i < this->n_var; i++)
         {
@@ -1326,6 +1347,10 @@ public:
                 if (this->var[i].dep == 0 && this->var[ this->var[i].cond_o[j] ].obj[0] == '?') {
                     this->var[ this->var[i].cond_o[j] ].dependent_of[ this->var[ this->var[i].cond_o[j] ].n_dep_of++ ] = i;
                     propagate_dependent(this->var[i].cond_o[j], 1);
+                    if (this->var[ this->var[i].cond_p[j] ].obj[0] == '?') {
+                        this->var[ this->var[i].cond_p[j] ].dependent_of[ this->var[ this->var[i].cond_p[j] ].n_dep_of++ ] = i;
+                        propagate_dependent(this->var[i].cond_p[j], 1);
+                    }
                 }
             }
         }
@@ -1361,8 +1386,10 @@ public:
                 char *predicate = this->var[i].cond_p[j] == -1 ? relation : ( this->var[i].cond_p[j] == -2 ? relation_value : this->var[this->var[i].cond_p[j]].obj);
                 char *object = this->var[this->var[i].cond_o[j]].obj;
 //printf("\nCondition from %i to %i, j = %i. Subject = %s, %i candidates\n", i, this->var[i].cond_o[j], j, subject, this->var[i].n_cand);
-                if (subject[0] == '?' && this->var[i].n_cand)
+                if (subject[0] == '?') 
                 {
+                    if (this->var[i].n_cand == 0)
+                        bool match = get_candidates(i, this->var[i].cond_o[j], 0, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists, -1);
                     int limit_cand = this->var[i].n_cand;
 //printf("=== There are %i candidates\n", limit_cand);
                     for (int l = 0; l < limit_cand; l++) {
@@ -1385,15 +1412,11 @@ public:
                         else
                             match = get_candidates(i, this->var[i].cond_o[j], l, this->var[i].cand[l], predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[this->var[i].cond_o[j]].notexists, -1);
                         // Inverse condition - matching objects shall not exist
-                        if( this->var[this->var[i].cond_o[j]].notexists && !match ) {
+                        if( this->var[ this->var[i].cond_o[j] ].notexists && !match )
                             this->var[i].cand[l] = NULL;
-                        }
                     }
                 }
-                else {
-                    if (subject[0] != '?') add_candidate(i, subject, NULL, NULL);
-                    bool match = get_candidates(i, this->var[i].cond_o[j], 0, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists, -1);
-                }
+                else if (subject[0] != '?') add_candidate(i, subject, NULL, NULL);
             }
         }
     // Remove references to non-existant variables
@@ -1433,13 +1456,13 @@ public:
             }
         }
     }
-
+/*
 printf("Variables:\n");
 for(int x=0; x<n; x++) {
     int i = order[x];
     if(this->var[i].obj[0] != '?' && this->var[i].n == 0)
         continue;
-    printf("%i:\t%s, dep = %i\n", i, this->var[i].obj, this->var[i].dep);
+    printf("%i:\t%s, dep = %i, optional = %i, notexists = %i\n", i, this->var[i].obj, this->var[i].dep, this->var[i].optional, this->var[i].notexists);
     for(int j=0; j<this->var[i].n; j++)
         printf("\t\t%s => %s\n", this->var[i].cond_p[j] == -1 ? "relation" : ( this->var[i].cond_p[j] == -2 ? relation_value : this->var[this->var[i].cond_p[j]].obj), this->var[this->var[i].cond_o[j]].obj);
     if(this->var[i].n_dep_of) {
@@ -1489,15 +1512,17 @@ for(int i=0; i<this->_n_filters; i++) {
             int i = order[x];
             if (this->var[i].obj[0] != '?' || this->var[i].n_cand == 0 || this->var[i].notexists)
                 continue;
-            bool found = false;
             // Check if there is at least one dependent variable
-            for (int y = 0; y < n; y++) {
-                for (int z = 0; z < this->var[y].n_dep_of; z++) {
-                    if (this->var[y].dependent_of[z] == i)
-                        found = true;
+            if (max_dep > 0) {
+                bool found = false;
+                for (int y = 0; y < n; y++) {
+                    for (int z = 0; z < this->var[y].n_dep_of; z++) {
+                        if (this->var[y].dependent_of[z] == i)
+                            found = true;
+                    }
                 }
+                if(!found) continue;
             }
-            if(!found) continue;
             bool relation = false;
             for (int y = 0; y < this->var[i].n; y++) {
                 if (this->var[i].cond_p[y] == -2)
@@ -1545,6 +1570,7 @@ for(int i=0; i<this->_n_filters; i++) {
             // For ordinary variables
             else {
                 for (int y = 0; y < this->var[i].n_cand; y++) {
+                    if (this->var[i].cand[y] == NULL) continue;
                     int combination[32];
                     memset(&combination, -1, sizeof(int)*32);
                     combination[i] = y;
@@ -1601,7 +1627,7 @@ for(int i=0; i<this->_n_filters; i++) {
                 }
             }
         }
-
+/*
 printf("\nCombinations for variables:\n");
 for (int x = 0; x < n; x++)
 {
@@ -1618,7 +1644,7 @@ for (int x = 0; x < n; x++)
         printf("\n");
     }
 }
-
+*/
         // Push the combination of the independent variables into the global array of combinations, and transform candidates indexes into URIs or literal values
         for (int i = 0; i < n; i++) {
             if (this->var[i].dep > 0) continue;
@@ -1646,7 +1672,7 @@ for (int x = 0; x < n; x++)
             }
         }
 
-        // Cycle through incomplete combinations to make complete ones
+        // Cycle through the combinations generated for independent variables to make complete ones
         for (int z = 0; z < this->n_pcv; z++)
         {
             // Cycle through all remaining combinations
@@ -1712,7 +1738,7 @@ for (int x = 0; x < n; x++)
                 }
             }
         }
-
+/*
 printf("\nCombinations:\n");
 for (int x = 0; x < this->n_pcv; x++) {
     for (int l = 0; l < this->n_var; l++) {
@@ -1721,7 +1747,7 @@ for (int x = 0; x < this->n_pcv; x++) {
     }
     printf("\n\n");
 }
-
+*/
         // Apply filters
         for (int z = 0; z < this->n_pcv; z++) {
             bool filter_match[32], incomplete = false, fixed_lvalue = false, fixed_rvalue = false;
@@ -1912,16 +1938,18 @@ for (int x = 0; x < this->n_pcv; x++) {
             bool complete = true;
             for (int x = 0; x < n; x++) {
                 int i = order[x];
-                if (this->var[i].notexists)
+                if (this->var[i].notexists || this->var[i].optional)
                     continue;
                 if (this->var[i].obj[0] != '?')
                     continue;
                 if (this->pre_comb_value[z][i] == NULL) {
+//printf("%s has no value", this->var[i].obj);
                     complete = false;
                     break;
                 }
             }
             if (!complete) {
+//printf(" - incomplete\n");
                 free(this->pre_comb_value[z]);
                 free(this->pre_comb_value_type[z]);
                 free(this->pre_comb_value_lang[z]);
@@ -2066,7 +2094,7 @@ char *process_request(char *buffer, int operation, int endpoint, int modifier, i
     char *pmessage = NULL;
     if (!req.parse_request(buffer, &pmessage, 0, operation, endpoint, modifier, pip))
     {
-logger(LOG, "Goint to free_all", "", 0);
+//        logger(LOG, "Goint to free_all", "", 0);
         req.free_all();
         return pmessage;
     }
