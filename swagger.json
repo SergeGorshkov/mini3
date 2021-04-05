@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "mini3 triple store",
-    "version": "1"
+    "title": "mini-3 triple store",
+    "version": "0.8"
   },
   "servers": [
     {
@@ -476,6 +476,14 @@
                 "type": "string"
               }
             }
+          },
+          "Limit": {
+            "type": "integer",
+            "description": "The number of records to be returned"
+          },
+          "Offset": {
+            "type": "integer",
+            "description": "The number of the first record to be returned"
           }
         },
         "example": {
@@ -499,7 +507,8 @@
 	    [
 	      "object", "desc"
 	    ]
-	  ]
+	  ],
+	  "Limit": "10"
         }
       },
       "ArrayOfTriples": {
@@ -569,8 +578,8 @@
               "type": "array",
               "items": {
                 "type": "array",
-		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, more, less, moreorequal, lessorequal), the third is another ?variable or constant.",
-                "minItems": "3",
+		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
+                "minItems": "2",
                 "maxItems": "3",
                 "items": {
                   "type": "string"
@@ -578,6 +587,13 @@
               }
             }
           },
+	  "Optional": {
+	    "type": "array",
+	    "description": "Array of the names of the optional variables",
+	    "items": {
+	      "type": "string"
+	    }
+	  },
           "Order": {
             "type": "array",
             "description": "Array of result sorting sequences (optional). The first item of each element is a ?variable, the second item is the sort order: asc or desc.",
@@ -589,6 +605,14 @@
                 "type": "string"
               }
             }
+          },
+          "Limit": {
+            "type": "integer",
+            "description": "The number of records to be returned"
+          },
+          "Offset": {
+            "type": "integer",
+            "description": "The number of the first record to be returned"
           }
         },
         "example": {
@@ -605,6 +629,7 @@
               "?name"
             ]
           ],
+	  "Optional": [ "?name" ],
           "Filter": [
 	    "and",
             [
@@ -633,7 +658,8 @@
 	    [
 	      "?name", "desc"
 	    ]
-	  ]
+	  ],
+	  "Limit": "10"
         }
       },
       "ArrayOfSolutions": {
