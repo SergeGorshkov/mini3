@@ -13,6 +13,36 @@ function request( $method, $endpoint, $query ) {
     return json_decode( $response );
 }
 
+$req = [    'RequestId' => '3',
+	    'Chain' => [
+                [ '?a', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?type' ],
+                [ '?a', 'http://trinidata.ru/archigraph-mdm/SourceSystem', '?field_0_0' ],
+            ],
+            'Order' => [ [ '?type', 'asc' ],
+        	[ '?a', 'desc' ]
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'or',
+        	    [ '?type', 'equal', 'http://localhost/Person' ],
+        	    [ '?type', 'equal', 'http://localhost/Programmer' ],
+        	],
+        	[ 'and',
+        	    [ '?field_0_0', 'notexists', '' ]
+        	]
+            ]
+            ];
+
+$st = microtime(true);
+$res = request('GET', 'chain', $req );
+$et = microtime(true);
+if($res->Status == 'Ok') echo("OK");
+else echo("ERROR!");
+echo(" ".round($et-$st,3)."\n");
+print_r($res);
+exit;
+/*
+
 // Send prefixes
 echo("1. PUT prefixes\n");
 $req = [ 'RequestId' => '1',
@@ -411,5 +441,5 @@ foreach( $tests as $ind => $test ) {
 		}
 	}
 }
-
+*/
 ?>

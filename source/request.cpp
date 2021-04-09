@@ -1781,7 +1781,7 @@ for (int x = 0; x < this->n_pcv; x++) {
                     fixed_rvalue = true;
                 }
 //printf("filter %i, lvalue: %s, rvalue: %s\n", i, lvalue, rvalue);
-                if(!lvalue || !rvalue) {
+                if((!lvalue || !rvalue ) && this->_filters[i].operation != COMPARE_NOTEXISTS) {
                     incomplete = true;
                     break;
                 }
@@ -1849,6 +1849,7 @@ for (int x = 0; x < this->n_pcv; x++) {
 //printf("Result of filter %i: %s\n", i, (result?"true":"false"));
             }
             // Now let us check filters combinations
+//printf("incomplete: %i, nfg: %i\n", incomplete, this->_n_filter_groups);
             if(!incomplete && this->_n_filter_groups > 0) {
                 bool resolved;
                 int iterations = 1;

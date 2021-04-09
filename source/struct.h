@@ -130,8 +130,8 @@ struct filter
 
 struct filter_group
 {
-    int group;
-    int logic;
+    int group;  // parent group
+    int logic;  // and, or
 };
 
 struct chain_variable
