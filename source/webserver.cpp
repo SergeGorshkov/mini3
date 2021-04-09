@@ -67,12 +67,16 @@ void web(int fd, int hit, int *pip)
 	if (!operation)
 		logger(FORBIDDEN, "Only GET, POST, PUT, DELETE operations are supported", buffer, fd);
 
+	char *endpos = strstr(buffer, "HTTP/");
+	char c = endpos[0];
+	endpos[0] = 0;
 	if (strstr(buffer, "/prefix") > 0)
 		endpoint = EP_PREFIX;
 	else if (strstr(buffer, "/triple") > 0)
 		endpoint = EP_TRIPLE;
 	else if (strstr(buffer, "/chain") > 0)
 		endpoint = EP_CHAIN;
+	endpos[0] = c;
 	if (strstr(buffer, "/count") > 0)
 		modifier |= MOD_COUNT;
 	if (!endpoint)

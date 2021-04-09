@@ -315,7 +315,7 @@ public:
     wrong_parameter:
         *message = (char *)malloc(128);
         if(!message) out_of_memory(fd);
-        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint", t);
+        sprintf(*message, "%s parameter cannot be specified in the request to this endpoint (%i)", t, endpoint);
         this->free_all();
     send_parse_error:
         if (buffer)

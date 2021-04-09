@@ -9,10 +9,11 @@ function request( $method, $endpoint, $query ) {
         ),
     ) );
     $response = file_get_contents( "http://localhost:8082/" . $endpoint, false, $context );
-//echo("Return: ".$response."\n");
+echo("Return: ".$response."\n");
     return json_decode( $response );
 }
 
+/*
 $req = [    'RequestId' => '3',
 	    'Chain' => [
                 [ '?a', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?type' ],
@@ -41,7 +42,7 @@ else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
 print_r($res);
 exit;
-/*
+*/
 
 // Send prefixes
 echo("1. PUT prefixes\n");
@@ -212,13 +213,12 @@ foreach($res->Result as $rr) {
 
 $req = [    'RequestId' => '4',
 	    'Chain' => [
-                [ '?lang', 'rdf:type', 'Language' ],
-                [ '?lang', 'isKnownBy', '?person' ],
+                [ '?a', 'rdf:type', '?type' ],
             ],
             'Filter' => [
         	'and',
         	[ 'and',
-        	    [ '?person', 'notexists', '' ]
+        	    [ '?type', 'equal', 'http://trinidata.ru/archigraph-mdm/prefix' ]
         	]
             ]
             ];
@@ -230,7 +230,7 @@ $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
-
+exit;
 // Print table
 foreach($res->Vars as $rr) {
     echo($rr."\t");
@@ -354,45 +354,45 @@ $tests = [
 
 $answers = [
 	    [ 'hasResult' =>
-	      [ [ '?lang' => 'C++', '?person' => 'Jack' ],
-	        [ '?lang' => 'C++', '?person' => 'Jane' ] ],
+	      [ [ '?lang' => 'http://localhost/C++', '?person' => 'http://localhost/Jack' ],
+	        [ '?lang' => 'http://localhost/C++', '?person' => 'http://localhost/Jane' ] ],
 	      'numRecords' => 2 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?lang' => 'C++', '?a' => 'rdfs:label', '?b' => 'C++' ],
-	        [ '?lang' => 'C++', '?a' => 'hasType', '?b' => 'Compilable' ],
-	        [ '?lang' => 'C++', '?a' => 'rdf:type', '?b' => 'Language' ],
-	        [ '?lang' => 'C++', '?a' => 'rdf:type', '?b' => 'owl:NamedIndividual' ] ],
+	      [ [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/2000/01/rdf-schema#label', '?b' => 'http://localhost/C++' ],
+	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://localhost/hasType', '?b' => 'http://localhost/Compilable' ],
+	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?b' => 'http://localhost/Language' ],
+	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?b' => 'http://www.w3.org/2002/07/owl#NamedIndividual' ] ],
 	      'numRecords' => 14 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?person' => 'Jack', '?name' => 'Jack Doe', '?lang' => 'C++', '?project' => 'ABC' ],
-	        [ '?person' => 'Jack', '?name' => 'Jack Doe', '?lang' => 'C++', '?project' => 'DEF' ]
-	        [ '?person' => 'Jack', '?name' => 'Джек Доу', '?lang' => 'JavaScript', '?project' => 'DEF' ]
-	        [ '?person' => 'Jack', '?name' => 'Jack Doe', '?lang' => 'JavaScript', '?project' => 'ABC' ]
-	        [ '?person' => 'Jack', '?name' => 'Jack Doe', '?lang' => 'PHP', '?project' => 'DEF' ] ],
+	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/ABC' ],
+	        [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF' ],
+	        [ '?person' => 'http://localhost/Jack', '?name' => 'Джек Доу', '?lang' => 'http://localhost/JavaScript', '?project' => 'http://localhost/DEF' ],
+	        [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/JavaScript', '?project' => 'http://localhost/ABC' ],
+	        [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/PHP', '?project' => 'http://localhost/DEF' ] ],
 	     'numRecords' => 25 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?lang' => 'C++', '?property' => 'rdfs:label', '?name' => 'C++' ] 
-	        [ '?lang' => 'PHP', '?property' => 'rdfs:label', '?name' => 'PHP' ] 
-	        [ '?lang' => 'JavaScript', '?property' => 'rdfs:label', '?name' => 'JavaScript' ] ],
+	      [ [ '?lang' => 'http://localhost/C++', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'C++' ], 
+	        [ '?lang' => 'http://localhost/PHP', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'PHP' ], 
+	        [ '?lang' => 'http://localhost/JavaScript', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'JavaScript' ] ],
 	      'numRecords' => 3 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?person1' => 'Jack', '?project' => 'ABC', '?lang1' => 'C++', '?type1' => 'Compilable', '?person2' => 'Jane', '?lang2' => 'C++', '?type2' => 'Compilable' ],
-	        [ '?person1' => 'Jane', '?lang1' => 'C++', '?type1' => 'Compilable', '?person2' => 'Jack', '?project' => 'ABC', '?lang2' => 'PHP', '?type1' => 'Interpretable' ] ],
+	      [ [ '?person1' => 'http://localhost/Jack', '?project' => 'http://localhost/ABC', '?lang1' => 'http://localhost/C++', '?type1' => 'http://localhost/Compilable', '?person2' => 'http://localhost/Jane', '?lang2' => 'http://localhost/C++', '?type2' => 'http://localhost/Compilable' ],
+	        [ '?person1' => 'http://localhost/Jane', '?lang1' => 'http://localhost/C++', '?type1' => 'http://localhost/Compilable', '?person2' => 'http://localhost/Jack', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/PHP', '?type1' => 'http://localhost/Interpretable' ] ],
 	      'numRecords' => 4 ],
 
 	    [ 'hasResult' => 
-	      [ [ '?person' => 'Jack', '?lang1' => 'PHP', 'name1' => 'PHP', '?project' => 'ABC', '?lang2' => 'C++' ],
-	        [ '?person' => 'Jack', '?lang1' => 'C++', 'name1' => 'C++', '?project' => 'DEF', '?lang2' => 'PHP' ],
-	        [ '?person' => 'Jack', '?lang1' => 'JavaScript', 'name1' => 'JavaScript', '?project' => 'ABC', '?lang2' => 'C++' ] ],
+	      [ [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/PHP', 'name1' => 'PHP', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++' ],
+	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/C++', 'name1' => 'C++', '?project' => 'http://localhost/DEF', '?lang2' => 'http://localhost/PHP' ],
+	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/JavaScript', 'name1' => 'JavaScript', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++' ] ],
 	      'numRecords' => 7 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?programmer' => 'Programmer', '?person' => 'Jack', '?name' => 'Jack Doe', '?year' => '1979', '?lang' => 'PHP', '?subclass' => 'Designer', '?persons2' => 'Jill', 'name2' => 'Jill Doe', '?year2' => '1990' ],
-	        [ '?programmer' => 'Programmer', '?person' => 'Jane', '?name' => 'Jane Doe', '?year' => '1985', '?lang' => 'C++', '?subclass' => 'Designer', '?persons2' => 'Jack', 'name2' => 'Jack Doe', '?year2' => '1979' ] ],
+	      [ [ '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?year' => '1979', '?lang' => 'http://localhost/PHP', '?subclass' => 'http://localhost/Designer', '?persons2' => 'http://localhost/Jill', 'name2' => 'Jill Doe', '?year2' => '1990' ],
+	        [ '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jane', '?name' => 'Jane Doe', '?year' => '1985', '?lang' => 'http://localhost/C++', '?subclass' => 'http://localhost/Designer', '?persons2' => 'http://localhost/Jack', 'name2' => 'Jack Doe', '?year2' => '1979' ] ],
 	      'numRecords' => 9 ]
 
 	];
@@ -410,14 +410,32 @@ foreach( $tests as $ind => $test ) {
 
 	$error = false;
 	foreach( $answers[ $ind ][ 'hasResult' ] as $result ) {
+		$found = false;
 		foreach( $res->Result as $rr ) {
-			if( sizeof( $result ) != sizeof( $rr ) ) {
-				echo( "Result size mismatch: " . sizeof( $rr ) . " instead of " . sizeof( $result ) . "\n");
-				$error = true;
-				break;
+			$rs = [];
+			foreach( $rr as $n => $r ) {
+				$rs[ $res->Vars[$n] ] = $r;
 			}
-		if( sizeof( array_diff_assoc( $rr, $result ) ) || sizeof( array_diff_assoc( $result, $rr ) ) ) {
-			echo( "Result mismatch:\n" . print_r( $rr, true ) . "\n" . print_r( $result, true ) . "\n" );
+echo("got\n");
+print_r($rs);
+			if( sizeof( $rs ) != sizeof( $rr ) ) {
+				echo( "Result size mismatch: " . sizeof( $rr ) . " instead of " . sizeof( $rs ) . "\n");
+				$error = true;
+				break 2;
+			}
+			if( !sizeof( array_diff_assoc( $rr, $rs ) ) && !sizeof( array_diff_assoc( $rs, $rr ) ) )
+				$found = true;
+			else {
+			echo("arrays:\n");
+			print_r($rr);
+			print_r($rs);
+			echo("diff:\n");
+			print_r(array_diff_assoc( $rr, $rs ));
+			print_r(array_diff_assoc( $rs, $rr ));
+			}
+		}
+		if( !$found ) {
+			echo( "Result not found:\n" . print_r( $result, true ) . "\n" );
 			$error = true;
 		}
 	}
@@ -440,6 +458,7 @@ foreach( $tests as $ind => $test ) {
 		    echo("\n");
 		}
 	}
+break;
 }
-*/
+
 ?>
