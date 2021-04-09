@@ -9,7 +9,7 @@ function request( $method, $endpoint, $query ) {
         ),
     ) );
     $response = file_get_contents( "http://localhost:8082/" . $endpoint, false, $context );
-echo("Return: ".$response."\n");
+//echo("Return: ".$response."\n");
     return json_decode( $response );
 }
 
@@ -211,38 +211,6 @@ foreach($res->Result as $rr) {
     echo("\n");
 }
 
-$req = [    'RequestId' => '4',
-	    'Chain' => [
-                [ '?a', 'rdf:type', '?type' ],
-            ],
-            'Filter' => [
-        	'and',
-        	[ 'and',
-        	    [ '?type', 'equal', 'http://trinidata.ru/archigraph-mdm/prefix' ]
-        	]
-            ]
-            ];
-
-echo("\n4. GET chain with notexists filter\n");
-$st = microtime(true);
-$res = request('GET', 'chain', $req );
-$et = microtime(true);
-if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
-echo(" ".round($et-$st,3)."\n");
-exit;
-// Print table
-foreach($res->Vars as $rr) {
-    echo($rr."\t");
-}
-echo("\n");
-foreach($res->Result as $rr) {
-    foreach($rr as $r) {
-	echo($r[0]."\t");
-    }
-    echo("\n");
-}
-
 $tests = [
 
 	[   'RequestId' => '0',
@@ -400,7 +368,7 @@ $answers = [
 
 echo("\n5. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-	echo("\n" . $ind . ". ");
+	echo("\n" . ($ind + 1) . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );
 	$et = microtime(true);
@@ -414,25 +382,23 @@ foreach( $tests as $ind => $test ) {
 		foreach( $res->Result as $rr ) {
 			$rs = [];
 			foreach( $rr as $n => $r ) {
-				$rs[ $res->Vars[$n] ] = $r;
+				$rs[ $res->Vars[$n] ] = $r[0];
 			}
-echo("got\n");
-print_r($rs);
-			if( sizeof( $rs ) != sizeof( $rr ) ) {
-				echo( "Result size mismatch: " . sizeof( $rr ) . " instead of " . sizeof( $rs ) . "\n");
+			if( sizeof( $rs ) != sizeof( $result ) ) {
+				echo( "Result size mismatch: " . sizeof( $result ) . " instead of " . sizeof( $rs ) . "\n");
 				$error = true;
 				break 2;
 			}
-			if( !sizeof( array_diff_assoc( $rr, $rs ) ) && !sizeof( array_diff_assoc( $rs, $rr ) ) )
+			if( !sizeof( array_diff_assoc( $result, $rs ) ) && !sizeof( array_diff_assoc( $rs, $result ) ) )
 				$found = true;
-			else {
+/*			else {
 			echo("arrays:\n");
-			print_r($rr);
+			print_r($result);
 			print_r($rs);
 			echo("diff:\n");
-			print_r(array_diff_assoc( $rr, $rs ));
-			print_r(array_diff_assoc( $rs, $rr ));
-			}
+			print_r(array_diff_assoc( $result, $rs ));
+			print_r(array_diff_assoc( $rs, $result ));
+			} */
 		}
 		if( !$found ) {
 			echo( "Result not found:\n" . print_r( $result, true ) . "\n" );
@@ -458,7 +424,8 @@ print_r($rs);
 		    echo("\n");
 		}
 	}
-break;
+	else
+		echo(" OK\n");
 }
 
 ?>

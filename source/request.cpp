@@ -3,7 +3,7 @@ class request
 {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, _n_filter_groups = 0, modifier = 0, current_filter_group[32];
+    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, _n_filter_groups = 0, modifier = 0, current_filter_group[32], limit = -1, offset = -1;
     local_triple _triples[1024];
     prefix _prefixes[1024];
     order _orders[32];
@@ -26,10 +26,10 @@ public:
     bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int modifier, int *pip) {
         int r = 0, pos = 0, status = 0, nested_array_items[32], current_level = 0, in_block = 0;
         char *t, *subject = NULL, *predicate = NULL, *object = NULL, *datatype = NULL, lang[8];
-        bool in_method = false, in_id = false;
+        bool in_method = false, in_id = false, in_limit = false, in_offset = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
-        memset(this->current_filter_group, 0, 32*sizeof(int));
+        memset(this->current_filter_group, -1, 32*sizeof(int));
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
         t = (char *)malloc(strlen(buffer) + 1);
@@ -80,7 +80,7 @@ public:
             }
 
             // This item is a string
-            if (tokens[i].type == 3 ) // && t[0] != '{') // Uncommenting this will disallow nested JSON in triples
+            if (tokens[i].type == 3 || tokens[i].type == 4) // && t[0] != '{') // Uncommenting this will disallow nested JSON in triples
             {
                 if (in_block != B_PATTERN && in_block != B_CHAIN && in_block != B_PREFIX && in_block != B_ORDER && in_block != B_FILTER)
                     strtolower(t);
@@ -94,6 +94,16 @@ public:
                 if (strcmp(t, "requestid") == 0)
                 {
                     in_id = true;
+                    continue;
+                }
+                if (strcmp(t, "limit") == 0)
+                {
+                    in_limit = true;
+                    continue;
+                }
+                if (strcmp(t, "offset") == 0)
+                {
+                    in_offset = true;
                     continue;
                 }
                 if (strcmp(t, "pattern") == 0 || strcmp(t, "triple") == 0)
@@ -163,6 +173,16 @@ public:
                 {
                     strcpy(this->request_id, t);
                     in_id = false;
+                }
+                else if (in_limit)
+                {
+                    this->limit = atoi(t);
+                    in_limit = false;
+                }
+                if (in_offset)
+                {
+                    this->offset = atoi(t);
+                    in_offset = false;
                 }
                 else if (in_method)
                 {
@@ -541,6 +561,15 @@ public:
         }
 //printf("%i %s - %s - %s\n", current_level, subject, predicate, object);
         // Filters grouping
+        if(current_level > 0) {
+            if(this->current_filter_group[current_level - 1] == -1) {
+                message = (char *)malloc(128);
+                if(!message) out_of_memory();
+                sprintf(message, "Logic operation (and, or) is not set in the filter group");
+                *status = -1;
+                return message;
+            }
+        }
         if(subject[0] && predicate == NULL && object == NULL) {
             strtolower(subject);
             this->_filter_groups[this->_n_filter_groups].logic = ((strcmp(subject, "or") == 0) ? LOGIC_OR : LOGIC_AND);
@@ -559,6 +588,14 @@ public:
             this->_filters[this->_n_filters].operation = COMPARE_EQUAL;
         else if(strcmp(predicate, "notequal") == 0)
             this->_filters[this->_n_filters].operation = COMPARE_NOTEQUAL;
+        else if(strcmp(predicate, "icontains") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_ICONTAINS;
+        else if(strcmp(predicate, "inotcontains") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_INOTCONTAINS;
+        else if(strcmp(predicate, "iequal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_IEQUAL;
+        else if(strcmp(predicate, "inotequal") == 0)
+            this->_filters[this->_n_filters].operation = COMPARE_INOTEQUAL;
         else if(strcmp(predicate, "more") == 0)
             this->_filters[this->_n_filters].operation = COMPARE_MORE;
         else if(strcmp(predicate, "less") == 0)
@@ -934,7 +971,12 @@ public:
             memcpy(this->_to_send, orders, this->_n_send*sizeof(unsigned long));
             free(unique); free(orders);
         }
+        // Result output
+        int sent = 0;
         for (int i = 0; i < this->_n_send; i++) {
+            if (this->offset != -1 && i < this->offset) continue;
+            if (this->limit != -1 && sent >= this->limit) break;
+            sent++;
             char ans[1024 * 10];
             sprintf(ans, "[\"%s\", \"%s\", \"%s\"", get_string(triples[this->_to_send[i]].s_pos), get_string(triples[this->_to_send[i]].p_pos), get_string(triples[this->_to_send[i]].o_pos));
             if (triples[this->_to_send[i]].d_len) {
@@ -1495,7 +1537,7 @@ for(int x=0; x<n; x++) {
         }
     }
 }
-/*
+
 printf("Filter groups: %i\n", this->_n_filter_groups);
 for(int i=0; i<this->_n_filter_groups; i++) {
     printf("%i: %i, %i\n", i, this->_filter_groups[i].group, this->_filter_groups[i].logic);
@@ -1785,6 +1827,14 @@ for (int x = 0; x < this->n_pcv; x++) {
                     incomplete = true;
                     break;
                 }
+                char *lv, *rv;
+                if(this->_filters[i].operation == COMPARE_IEQUAL || this->_filters[i].operation == COMPARE_INOTEQUAL || this->_filters[i].operation == COMPARE_ICONTAINS || this->_filters[i].operation == COMPARE_NOTCONTAINS) {
+                    lv = (char*)malloc(strlen(lvalue)+1);
+                    rv = (char*)malloc(strlen(rvalue)+1);
+                    if(!lv || !rv) out_of_memory();
+                    strcpy(lv, lvalue); strcpy(rv, rvalue);
+                    strtolower(lv); strtolower(rv);
+                }
                 bool result = false;
                 switch(this->_filters[i].operation) {
                     case COMPARE_CONTAINS:
@@ -1793,6 +1843,14 @@ for (int x = 0; x < this->n_pcv; x++) {
                         break;
                     case COMPARE_NOTCONTAINS:
                         if(!strstr(lvalue, rvalue))
+                            result = true;
+                        break;
+                    case COMPARE_ICONTAINS:
+                        if(strstr(lv, rv))
+                            result = true;
+                        break;
+                    case COMPARE_INOTCONTAINS:
+                        if(!strstr(lv, rv))
                             result = true;
                         break;
                     case COMPARE_EXISTS:
@@ -1805,7 +1863,8 @@ for (int x = 0; x < this->n_pcv; x++) {
                     case COMPARE_EQUAL:
                     case COMPARE_NOTEQUAL:
                         res = strcmp(lvalue, rvalue);
-                        if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
+                        if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) 
+                          || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
                             result = true;
                         if(fixed_lvalue) {
                             char *tmp = (char*)malloc(1024+strlen(lvalue));
@@ -1828,6 +1887,33 @@ for (int x = 0; x < this->n_pcv; x++) {
                             free(tmp);
                         }
                         break;
+                    case COMPARE_IEQUAL:
+                    case COMPARE_INOTEQUAL:
+                        res = strcmp(lv, rv);
+                        if((res == 0 && this->_filters[i].operation == COMPARE_EQUAL) 
+                          || (res != 0 && this->_filters[i].operation == COMPARE_NOTEQUAL))
+                            result = true;
+                        if(fixed_lvalue) {
+                            char *tmp = (char*)malloc(1024+strlen(lv));
+                            if(!tmp) out_of_memory();
+                            strcpy(tmp, lv);
+                            this->resolve_prefix(&tmp);
+                            res = strcmp(tmp, rv);
+                            if((res == 0 && this->_filters[i].operation == COMPARE_IEQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_INOTEQUAL))
+                                result = true;
+                            free(tmp);
+                        }
+                        if(fixed_rvalue) {
+                            char *tmp = (char*)malloc(1024+strlen(rv));
+                            if(!tmp) out_of_memory();
+                            strcpy(tmp, rv);
+                            this->resolve_prefix(&tmp);
+                            res = strcmp(lv, tmp);
+                            if((res == 0 && this->_filters[i].operation == COMPARE_IEQUAL) || (res != 0 && this->_filters[i].operation == COMPARE_INOTEQUAL))
+                                result = true;
+                            free(tmp);
+                        }
+                        break;
                     case COMPARE_MORE:
                         if(atof(lvalue) > atof(rvalue))
                             result = true;
@@ -1845,7 +1931,11 @@ for (int x = 0; x < this->n_pcv; x++) {
                             result = true;
                         break;
                 }
-            filter_match[i] = result;
+                if(this->_filters[i].operation == COMPARE_IEQUAL || this->_filters[i].operation == COMPARE_INOTEQUAL || this->_filters[i].operation == COMPARE_ICONTAINS || this->_filters[i].operation == COMPARE_NOTCONTAINS) {
+                    free(lv);
+                    free(rv);
+                }
+                filter_match[i] = result;
 //printf("Result of filter %i: %s\n", i, (result?"true":"false"));
             }
             // Now let us check filters combinations
@@ -2049,7 +2139,11 @@ for (int x = 0; x < this->n_pcv; x++) {
         strcat(vars, "] ");
 //printf("\n");
         first = true;
+        int sent = 0;
         for (int z = 0; z < this->n_pcv; z++) {
+            if (this->offset != -1 && z < this->offset) continue;
+            if (this->limit != -1 && sent >= this->limit) break;
+            sent++;
             if (!first)
                 strcat(result, ", ");
             first = false;

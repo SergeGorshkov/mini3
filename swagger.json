@@ -578,7 +578,7 @@
               "type": "array",
               "items": {
                 "type": "array",
-		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
+		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
                 "minItems": "2",
                 "maxItems": "3",
                 "items": {
@@ -646,8 +646,8 @@
               ],
               [
                 "?personname",
-                "contains",
-                "Bob"
+                "icontains",
+                "bob"
               ]
 	    ]
           ],
