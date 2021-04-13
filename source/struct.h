@@ -1,6 +1,5 @@
 
 #define OP_GET 1
-#define OP_POST 2
 #define OP_PUT 3
 #define OP_DELETE 4
 
@@ -23,6 +22,10 @@
 #define STATUS_DELETED 1
 
 #define N_MAX_PREFIX 64
+#define N_MAX_VARIABLES 32
+#define N_MAX_FILTERS 512
+#define N_MAX_FILTER_GROUPS 32
+#define N_MAX_ORDERS 32
 #define SEGMENT 32768    // The amount of triples after which the storage is reallocated
 #define CHUNK_SIZE 1024  // The segment size after which the index is chunked further
 #define MAX_CHUNKS 16384 // The maximal possible amount of chunks

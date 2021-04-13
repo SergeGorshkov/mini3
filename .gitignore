@@ -6,6 +6,7 @@ mini-3
 *.xml
 request*.json
 prefixes.json
+my.php
 /database*
 autotest2.php
 chain.php

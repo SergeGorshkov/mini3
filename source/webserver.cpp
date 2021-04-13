@@ -59,8 +59,10 @@ void web(int fd, int hit, int *pip)
 	if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0)
 		operation = OP_GET;
 	else if (strncmp(buffer, "POST ", 5) == 0 || strncmp(buffer, "post ", 5) == 0)
-		operation = OP_POST;
+		operation = OP_GET;
 	else if (strncmp(buffer, "PUT ", 4) == 0 || strncmp(buffer, "put ", 4) == 0)
+		operation = OP_PUT;
+	else if (strncmp(buffer, "PATCH ", 4) == 0 || strncmp(buffer, "patch ", 4) == 0)
 		operation = OP_PUT;
 	else if (strncmp(buffer, "DELETE ", 7) == 0 || strncmp(buffer, "delete ", 7) == 0)
 		operation = OP_DELETE;

@@ -3,21 +3,21 @@ class request
 {
 
 public:
-    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, _n_filter_groups = 0, modifier = 0, current_filter_group[32], limit = -1, offset = -1;
+    int _n_triples = 0, _n_prefixes = 0, _n_orders = 0, _n_filters = 0, _n_filter_groups = 0, modifier = 0, current_filter_group[N_MAX_FILTER_GROUPS], limit = -1, offset = -1;
     local_triple _triples[1024];
     prefix _prefixes[1024];
-    order _orders[32];
-    filter _filters[32];
-    filter_group _filter_groups[32];
+    order _orders[N_MAX_ORDERS];
+    filter _filters[N_MAX_FILTERS];
+    filter_group _filter_groups[N_MAX_FILTER_GROUPS];
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
     char request_id[1024];
 
     // Variables set for chain request
-    chain_variable var[32];
+    chain_variable var[N_MAX_VARIABLES];
     int n_var = 0, n_optional = 0, depth = 0;
-    char *optional[32];
+    char *optional[N_MAX_VARIABLES];
 
     // Set of candidate combinations
     char ***pre_comb_value, ***pre_comb_value_type, ***pre_comb_value_lang;
@@ -29,7 +29,7 @@ public:
         bool in_method = false, in_id = false, in_limit = false, in_offset = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
-        memset(this->current_filter_group, -1, 32*sizeof(int));
+        memset(this->current_filter_group, -1, N_MAX_FILTER_GROUPS*sizeof(int));
         init_globals(O_RDONLY);
         unicode_to_utf8(buffer);
         t = (char *)malloc(strlen(buffer) + 1);
@@ -188,10 +188,12 @@ public:
                 {
                     if (strcmp(t, "get") == 0)
                         operation = OP_GET;
+                    else if (strcmp(t, "post") == 0)
+                        operation = OP_GET;
                     else if (strcmp(t, "put") == 0)
                         operation = OP_PUT;
-                    else if (strcmp(t, "post") == 0)
-                        operation = OP_POST;
+                    else if (strcmp(t, "patch") == 0)
+                        operation = OP_PUT;
                     else if (strcmp(t, "delete") == 0)
                         operation = OP_DELETE;
                     if (!operation)
@@ -289,7 +291,7 @@ public:
 
         // Finished JSON processing, start performing actions
         this->modifier = modifier;
-        if (endpoint == EP_PREFIX && this->_n_prefixes && (operation == OP_PUT || operation == OP_POST))
+        if (endpoint == EP_PREFIX && this->_n_prefixes && operation == OP_PUT)
         {
             logger(LOG, "PUT prefix request", this->request_id, 0);
             if (*message = this->commit_prefixes())
@@ -533,7 +535,7 @@ public:
     char *save_order(char *subject, char *object, int *status)
     {
         char *message;
-        if (this->_n_prefixes >= 32)
+        if (this->_n_orders >= N_MAX_ORDERS)
         {
             message = (char *)malloc(128);
             if(!message) out_of_memory();
@@ -551,7 +553,7 @@ public:
     char *save_filter(char *subject, char *predicate, char *object, int *status, int current_level)
     {
         char *message;
-        if (this->_n_filters >= 32)
+        if (this->_n_filters >= N_MAX_FILTERS)
         {
             message = (char *)malloc(128);
             if(!message) out_of_memory();
@@ -654,7 +656,7 @@ public:
                     break;
                 }
             }
-            if (!found && this->n_var < 32)
+            if (!found && this->n_var < N_MAX_VARIABLES)
                 strcpy(this->var[this->n_var++].obj, *s);
             return NULL;
         }
@@ -1013,7 +1015,7 @@ public:
     // Add condition for the new variable
     int add_cond(char *obj)
     {
-        if (this->n_var >= 32)
+        if (this->n_var >= N_MAX_VARIABLES)
             return -1;
         strcpy(this->var[this->n_var].obj, obj);
         return this->n_var++;
@@ -1207,7 +1209,7 @@ public:
             if(!this->var[i].comb_value) out_of_memory();
         }
         /* int size = 0;
-        for (int k = 0; k < 32; k++) {
+        for (int k = 0; k < N_MAX_VARIABLES; k++) {
             if (comb[k] != -1)
                 size++;
         }
@@ -1215,7 +1217,7 @@ public:
         // Check if this combination already exists
         for (int j = 0; j < this->var[i].n_comb; j++) {
             bool identical = true;
-            for (int k = 0; k < 32; k++) {
+            for (int k = 0; k < N_MAX_VARIABLES; k++) {
                 if (comb[k] != this->var[i].comb_value[j][k]) {
                     identical = false;
                     break;
@@ -1223,9 +1225,9 @@ public:
             }
             if (identical) return;
         }
-        this->var[i].comb_value[this->var[i].n_comb] = (int *)malloc(32 * sizeof(int));
+        this->var[i].comb_value[this->var[i].n_comb] = (int *)malloc(N_MAX_VARIABLES * sizeof(int));
         if (!this->var[i].comb_value[this->var[i].n_comb]) out_of_memory();
-        memcpy(this->var[i].comb_value[this->var[i].n_comb], comb, sizeof(int)*32);
+        memcpy(this->var[i].comb_value[this->var[i].n_comb], comb, sizeof(int)*N_MAX_VARIABLES);
         this->var[i].n_comb++;
     }
 
@@ -1280,9 +1282,18 @@ public:
         // For the ordinary variables
         else {
             if (this->var[i].n_sol[value_var] > 0) {
+                bool found = false;
                 for (int j = 0; j < this->var[i].n_sol[value_var]; j++) {
                     if (this->var[i].solution_cand[value_var][j] != id) continue;
                     comb[value_var] = this->var[i].solution[value_var][j];
+                    found = true;
+                    if(ind_cond > this->var[i].n - 1)
+                        this->push_combination(i, comb);
+                    else
+                        this->build_combination(i, id, comb, ind_cond+1, bearer);
+                }
+                if (!found && this->var[value_var].optional) {
+                    comb[value_var] = -1;
                     if(ind_cond > this->var[i].n - 1)
                         this->push_combination(i, comb);
                     else
@@ -1311,15 +1322,15 @@ public:
             this->pre_comb_value_lang = (char ***)realloc(this->pre_comb_value_lang, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
             if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
         }
-        this->pre_comb_value[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+        this->pre_comb_value[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
         if(!this->pre_comb_value[this->n_pcv]) out_of_memory();
-        memset(this->pre_comb_value[this->n_pcv], 0, 32 * sizeof(char *));
-        this->pre_comb_value_type[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+        memset(this->pre_comb_value[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
+        this->pre_comb_value_type[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
         if(!this->pre_comb_value_type[this->n_pcv]) out_of_memory();
-        memset(this->pre_comb_value_type[this->n_pcv], 0, 32 * sizeof(char *));
-        this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+        memset(this->pre_comb_value_type[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
+        this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
         if(!this->pre_comb_value_lang[this->n_pcv]) out_of_memory();
-        memset(this->pre_comb_value_lang[this->n_pcv], 0, 32 * sizeof(char *));
+        memset(this->pre_comb_value_lang[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
         for (int l = 0; l < this->n_var; l++) {
             if (this->var[i].comb_value[j][l] < 0) continue;
             this->pre_comb_value[this->n_pcv][l] = this->var[l].cand[ this->var[i].comb_value[j][l] ];
@@ -1338,9 +1349,9 @@ public:
     // Entry point for triples chain request
     char *return_triples_chain(char *reqid)
     {
-        int order[32], max_dep = 0, n = 0;
+        int order[N_MAX_ORDERS], max_dep = 0, n = 0;
         char star[2] = "*", relation[9] = "relation", relation_value[15] = "relation_value";
-        memset(order, 0, sizeof(int) * 32);
+        memset(order, 0, sizeof(int) * N_MAX_ORDERS);
         // Fill the conditions
 //printf("Patterns: %i\n", this->_n_triples);
         for (int i = 0; i < this->_n_triples; i++)
@@ -1433,8 +1444,9 @@ public:
                     if (this->var[i].n_cand == 0)
                         bool match = get_candidates(i, this->var[i].cond_o[j], 0, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists, -1);
                     int limit_cand = this->var[i].n_cand;
-//printf("=== There are %i candidates\n", limit_cand);
+//printf("=== There are %i candidates, predicate = %s\n", limit_cand, predicate);
                     for (int l = 0; l < limit_cand; l++) {
+                        if (this->var[i].cand[l] == NULL) continue;
                         bool match;
                         if (predicate == relation) {
                             match = get_candidates(i, this->var[i].cond_o[j], l, this->var[i].cand[l], object[0] == '?' ? star : object, star, this->var[this->var[i].cond_o[j]].notexists, -1);
@@ -1483,7 +1495,7 @@ public:
         int i = order[x];
         if (this->var[i].obj[0] != '?' && this->var[i].n == 0)
             continue;
-        for (int k = 0; k < 32; k++) {
+        for (int k = 0; k < N_MAX_VARIABLES; k++) {
             for (int j = 0; j < this->var[i].n_sol[k]; j++) {
                 if (this->var[i].solution[k][j] < 0) {
                     if (j < this->var[i].n_sol[k] - 1) {
@@ -1520,7 +1532,7 @@ for(int x=0; x<n; x++) {
         printf("\t\t%s\n", this->var[i].cand[j]);
     }
     printf("\tSolutions:\n");
-    for(int k=0; k<32; k++) {
+    for(int k=0; k<N_MAX_VARIABLES; k++) {
         if(this->var[i].n_sol[k] == 0) continue;
         printf("\t\t%s: %i\n", this->var[k].obj, this->var[i].n_sol[k]);
         for(int j=0; j<this->var[i].n_sol[k]; j++) {
@@ -1576,8 +1588,8 @@ for(int i=0; i<this->_n_filters; i++) {
                 int dep = this->var[i].dependent_of[0];
 //printf("Variable %i has %i candidates\n", dep, this->var[dep].n_cand);
                 for (int y = 0; y < this->var[dep].n_cand; y++) {
-                    int combination[32];
-                    memset(&combination, -1, sizeof(int)*32);
+                    int combination[N_MAX_VARIABLES];
+                    memset(&combination, -1, sizeof(int)*N_MAX_VARIABLES);
                     combination[dep] = y; // Put source object (bearer) to the combination
 //printf("Source candidate object %i\nThere are %i solutions from %i to %i\n", y, this->var[dep].n_sol[i], dep, i);
                     // Cycle through solutions from the parent variable to the current variable
@@ -1613,8 +1625,8 @@ for(int i=0; i<this->_n_filters; i++) {
             else {
                 for (int y = 0; y < this->var[i].n_cand; y++) {
                     if (this->var[i].cand[y] == NULL) continue;
-                    int combination[32];
-                    memset(&combination, -1, sizeof(int)*32);
+                    int combination[N_MAX_VARIABLES];
+                    memset(&combination, -1, sizeof(int)*N_MAX_VARIABLES);
                     combination[i] = y;
                     build_combination(i, y, combination, 0, 1);
                 }
@@ -1647,8 +1659,8 @@ for(int i=0; i<this->_n_filters; i++) {
                     bool unset = false;
                     for (int k = 0; k < this->var[y].n_comb; k++) {
                         bool incompatible = false;
-                        int newcomb[32];
-                        memset(newcomb, -1, 32*sizeof(int));
+                        int newcomb[N_MAX_VARIABLES];
+                        memset(newcomb, -1, N_MAX_VARIABLES*sizeof(int));
                         for (int z = 0; z < n; z++) {
                             if (this->var[i].comb_value[j][z] != -1 && this->var[y].comb_value[k][z] != -1 && this->var[i].comb_value[j][z] != this->var[y].comb_value[k][z]) {
                                 incompatible = true;
@@ -1679,7 +1691,7 @@ for (int x = 0; x < n; x++)
     for(int y = 0; y < this->var[i].n_comb; y++) {
         if(this->var[i].comb_value[y][0] == -2) continue;
         printf("\t");
-        for(int z = 0; z < 32; z++) {
+        for(int z = 0; z < N_MAX_VARIABLES; z++) {
             if(this->var[i].comb_value[y][z] != -1)
                 printf("%s = %s, ", this->var[z].obj, this->var[z].cand[this->var[i].comb_value[y][z]]);
         }
@@ -1723,7 +1735,7 @@ for (int x = 0; x < n; x++)
             {
                 bool compat = true, inequal = false;
                 // Every non-empty element of the compatible remaining combination must be present in the source combination, if the value of the same variable is set in the source combination
-                for (int v = 0; v < 32; v++)
+                for (int v = 0; v < N_MAX_VARIABLES; v++)
                 {
                     if (this->pre_comb_value[z][v] == NULL)
                     {
@@ -1754,16 +1766,16 @@ for (int x = 0; x < n; x++)
                         this->pre_comb_value_lang = (char ***)realloc(this->pre_comb_value_lang, (this->n_pcv / 1024 + 1) * 1024 * sizeof(char **));
                         if(!this->pre_comb_value || !this->pre_comb_value_type || !this->pre_comb_value_lang) out_of_memory();
                     }
-                    this->pre_comb_value[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    this->pre_comb_value[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
                     if(!this->pre_comb_value[this->n_pcv]) out_of_memory();
-                    memset(this->pre_comb_value[this->n_pcv], 0, 32 * sizeof(char *));
-                    this->pre_comb_value_type[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    memset(this->pre_comb_value[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
+                    this->pre_comb_value_type[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
                     if(!this->pre_comb_value_type[this->n_pcv]) out_of_memory();
-                    memset(this->pre_comb_value_type[this->n_pcv], 0, 32 * sizeof(char *));
-                    this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(32 * sizeof(char *));
+                    memset(this->pre_comb_value_type[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
+                    this->pre_comb_value_lang[this->n_pcv] = (char **)malloc(N_MAX_VARIABLES * sizeof(char *));
                     if(!this->pre_comb_value_lang[this->n_pcv]) out_of_memory();
-                    memset(this->pre_comb_value_lang[this->n_pcv], 0, 32 * sizeof(char *));
-                    for (int v = 0; v < 32; v++)
+                    memset(this->pre_comb_value_lang[this->n_pcv], 0, N_MAX_VARIABLES * sizeof(char *));
+                    for (int v = 0; v < N_MAX_VARIABLES; v++)
                     {
                         if (this->pre_comb_value[z][v] != NULL) {
                             this->pre_comb_value[this->n_pcv][v] = this->pre_comb_value[z][v];
@@ -1792,9 +1804,9 @@ for (int x = 0; x < this->n_pcv; x++) {
 */
         // Apply filters
         for (int z = 0; z < this->n_pcv; z++) {
-            bool filter_match[32], incomplete = false, fixed_lvalue = false, fixed_rvalue = false;
-            int group_match[32], res;
-            memset(filter_match, 0, 32*sizeof(bool)); memset(group_match, 0, 32*sizeof(int));
+            bool filter_match[N_MAX_FILTERS], incomplete = false, fixed_lvalue = false, fixed_rvalue = false;
+            int group_match[N_MAX_FILTER_GROUPS], res;
+            memset(filter_match, 0, N_MAX_FILTERS*sizeof(bool)); memset(group_match, 0, N_MAX_FILTER_GROUPS*sizeof(int));
             // First, let us check each individual filter
             for(int i=0; i<this->_n_filters; i++) {
                 char *lvalue = NULL, *rvalue = NULL;
@@ -2020,7 +2032,7 @@ for (int x = 0; x < this->n_pcv; x++) {
         }
 
         // Output complete combinations
-        char vars[1024 * 32], *result;
+        char vars[1024 * N_MAX_VARIABLES], *result;
         bool first = true, first_val = true;
         result = (char *)malloc(1024 * 3 * this->n_pcv);
         if(!result) out_of_memory();
@@ -2076,6 +2088,10 @@ for (int x = 0; x < this->n_pcv; x++) {
             }
             for (int z = 0; z < this->n_pcv; z++) {
                 if(!this->pre_comb_value[z]) continue;
+                if(!this->pre_comb_value[z][sort_var_index]) {
+                    this->pre_comb_value[z][sort_var_index] = (char*)malloc(2);
+                    this->pre_comb_value[z][sort_var_index][0] = 0;
+                }
                 unique[z] = this->pre_comb_value[z][sort_var_index];
             }
             qsort(unique, this->n_pcv, sizeof(char*), cstring_cmp);
