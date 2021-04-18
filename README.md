@@ -1,29 +1,29 @@
-Описание для CentOS
+Build guide for CentOS
 
-Установка gcc и стандартных библиотек  
+1) Install gcc and standard libraries:
 yum install gcc  
 yum install libstdc++  
 yum install gcc-c++
   
-Установка librabbitmq  
+2) Install librabbitmq  
 yum install cmake  
-Скачать https://github.com/alanxz/rabbitmq-c/archive/master.zip и разархивировать. Из этой папки  
+Download and unpack https://github.com/alanxz/rabbitmq-c/archive/master.zip. Run from the unpacked folder:
 mkdir build && cd build  
 cmake -DCMAKE_C_COMPILER="/usr/bin/gcc" -DCMAKE_MAKE_PROGRAM="/usr/bin/make" -DENABLE_SSL_SUPPORT=OFF ..  
 cmake --build . --target install  
-По какой-то причине на моей машине эта команда собрала библиотеку в /usr/local/lib64, а нужно было в /lib64. Пришлось скопировать туда библиотеку вручную.  
+Check that the library is built into the right location (for example, /lib64)
   
-Установка librdkafka  
-https://github.com/edenhill/librdkafka/archive/master.zip и разархивировать. Из этой папки  
+3) Install librdkafka  
+Download and unpack https://github.com/edenhill/librdkafka/archive/master.zip. Run from the unpacked folder:
 ./configure --install-deps  
 make  
 sudo make install  
   
-Сборка mini3 - выполняем из папки mini3  
-/usr/bin/gcc -m64 -lcrypto -lpthread -lstdc++ -lrabbitmq -lrdkafka -g0 mini3.cpp -o /path/to/mini3  
-(/path/to заменить на путь к папке с исходниками)  
+4) Build mini-3
+/usr/bin/gcc -m64 -lcrypto -lpthread -lstdc++ -lrabbitmq -lrdkafka -g0 mini3.cpp -o /path/to/mini-3  
+(Change /path/to to the folder with the sources)  
 
-После этого можно запускать сервер, например:  
-./mini3 8081  
+5) Run server, for example:
+./mini3 8082  
 
 
