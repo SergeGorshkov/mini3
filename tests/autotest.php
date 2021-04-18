@@ -12,6 +12,7 @@ function request( $method, $endpoint, $query ) {
 //echo("Return: ".$response."\n");
     return json_decode( $response );
 }
+
 /*
 $req = [    'RequestId' => '6',
             'Pattern' => [
@@ -22,6 +23,7 @@ $res = request( 'GET', 'triple', $req );
 print_r($res);
 exit;
 */
+
 // Send prefixes
 echo("1. PUT prefixes:\t\t\t");
 $req = [ 'RequestId' => '1',
@@ -133,7 +135,7 @@ $st = microtime(true);
 $res = request( 'GET', 'triple', $req );
 $et = microtime(true);
 if($res->Status == 'Ok' && sizeof($res->Triples) == 4) echo("OK");
-else echo("ERROR! ".print_r($res, true));
+else echo("ERROR! ".sizeof($res->Triples));
 echo("\t".round($et-$st,3)."\n");
 
 // Get triples by pattern with sorting

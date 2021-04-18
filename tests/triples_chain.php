@@ -104,17 +104,23 @@ $req = [    'RequestId' => '2',
 		[ 'Jack', 'rdf:type', 'Programmer' ],
 		[ 'Jack', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jack', 'yearOfBirth', '1979', 'xsd:integer' ],
+		[ 'Jack', 'worksSince', '2015-05-23', 'xsd:date' ],
+		[ 'Jack', 'lastVisit', '2021-04-12T15:24:45', 'xsd:datetime' ],
 		[ 'Jack', 'rdfs:label', 'Jack Doe', 'xsd:string', 'EN' ],
 		[ 'Jack', 'rdfs:label', 'Джек Доу', 'xsd:string', 'RU' ],
 		[ 'Jane', 'rdf:type', 'Person' ],
 		[ 'Jane', 'rdf:type', 'Programmer' ],
 		[ 'Jane', 'rdf:type', 'Designer' ],
 		[ 'Jane', 'yearOfBirth', '1985', 'xsd:integer' ],
+		[ 'Jane', 'worksSince', '2016-12-18', 'xsd:date' ],
+		[ 'Jane', 'lastVisit', '2021-04-12T12:21:23', 'xsd:datetime' ],
 		[ 'Jane', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jane', 'rdfs:label', 'Jane Doe', 'xsd:string', 'EN' ],
 		[ 'Jill', 'rdf:type', 'Person' ],
 		[ 'Jill', 'rdf:type', 'Designer' ],
 		[ 'Jill', 'yearOfBirth', '1990', 'xsd:integer' ],
+		[ 'Jill', 'worksSince', '2015-05-18', 'xsd:date' ],
+		[ 'Jill', 'lastVisit', '2021-04-12T15:28:12', 'xsd:datetime' ],
 		[ 'Jill', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jill', 'rdfs:label', 'Jill Doe', 'xsd:string', 'EN' ],
 		[ 'PHP', 'rdf:type', 'Language' ],
@@ -164,27 +170,20 @@ $res = request( 'PUT', 'triple', $req );
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
-
+/*
 $req = [    'RequestId' => '3',
 	    'Chain' => [
-                [ 'Jack', 'knows', '?lang' ],
-                [ '?lang', 'hasType', '?type' ],
-                [ '?type', 'rdfs:label', '?typename' ],
-                [ '?person', 'rdf:type', 'Person' ],
-                [ '?person', 'rdfs:label', '?personname' ],
-                [ '?lang', '?known', '?person' ],
-            ],
-            'Order' => [ [ '?person', 'desc' ],
-        		 [ '?personname', 'asc' ]
+                [ '?person1', 'rdf:type', 'Person' ],
+                [ '?person1', 'worksSince', '?works1' ],
+                [ '?person1', 'lastVisit', '?visit1' ],
+                [ '?person2', 'rdf:type', 'Person' ],
+                [ '?person2', 'worksSince', '?works2' ],
+                [ '?person2', 'lastVisit', '?visit2' ],
             ],
             'Filter' => [
         	'and',
-        	[ 'or',
-        	    [ '?personname', 'contains', 'Jack' ],
-        	    [ '?personname', 'contains', 'Сергей' ],
-        	],
         	[ 'and',
-        	    [ '?lang', 'equal', 'C++' ]
+        	    [ '?visit1', 'more', '2021-04-12T14:00:00' ]
         	]
             ]
             ];
@@ -210,6 +209,8 @@ foreach($res->Result as $rr) {
     }
     echo("\n");
 }
+exit;
+*/
 
 $tests = [
 
