@@ -12,11 +12,13 @@ private:
     unsigned long *_to_delete = 0, _n_delete = 0;
     unsigned long *_to_send = 0, _n_send = 0;
     char type[256];
+    int current_union = -1;
 
     // Variables set for chain request
     chain_variable var[N_MAX_VARIABLES];
     int n_var = 0, n_optional = 0, depth = 0;
     char *optional[N_MAX_VARIABLES];
+    int optional_group[N_MAX_VARIABLES], current_optional = -1;
 
     // Set of candidate combinations
     char ***pre_comb_value, ***pre_comb_value_type, ***pre_comb_value_lang;
@@ -26,12 +28,13 @@ public:
     char request_id[1024];
 
     bool parse_request(char *buffer, char **message, int fd, int operation, int endpoint, int modifier, int *pip) {
-        int r = 0, pos = 0, status = 0, nested_array_items[32], current_level = 0, in_block = 0;
+        int r = 0, pos = 0, status = 0, in_block = 0, current_level = 0, nested_array_items[32];
         char *t, *subject = NULL, *predicate = NULL, *object = NULL, *datatype = NULL, lang[8];
         bool in_method = false, in_id = false, in_limit = false, in_offset = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
         memset(this->current_filter_group, -1, N_MAX_FILTER_GROUPS*sizeof(int));
+        memset(this->optional_group, -1, N_MAX_VARIABLES*sizeof(int));
         utils::init_globals(O_RDONLY);
         utils::unicode_to_utf8(buffer);
         t = (char *)malloc(strlen(buffer) + 1);
@@ -71,17 +74,22 @@ public:
                 lang[0] = 0;
                 if (status == -1)
                     goto send_parse_error;
-                if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN || in_block == B_ORDER || in_block == B_FILTER)) {
-                    if(nested_array_items[current_level] > 0)
+                if (tokens[i].type == 2 && (in_block == B_CHAIN || in_block == B_PATTERN || in_block == B_OPTIONAL || in_block == B_ORDER || in_block == B_FILTER)) {
+                    if (nested_array_items[current_level] > 0) {
                         nested_array_items[++current_level] = tokens[i].size;
+                        if (in_block == B_CHAIN && current_level == 2)
+                            current_union++;
+                        if (in_block == B_OPTIONAL && current_level == 1)
+                            current_optional++;
+                    }
                     else
                         nested_array_items[current_level] = tokens[i].size;
                 }
                 pos = 0;
             }
 
-            // This item is a string
-            if (tokens[i].type == 3 || tokens[i].type == 4) // && t[0] != '{') // Uncommenting this will disallow nested JSON in triples
+            // This item is a string or number
+            if (tokens[i].type == 3 || tokens[i].type == 4)
             {
                 if (in_block != B_PATTERN && in_block != B_CHAIN && in_block != B_PREFIX && in_block != B_ORDER && in_block != B_FILTER)
                     utils::strtolower(t);
@@ -209,7 +217,12 @@ public:
                 }
                 else if (in_block == B_OPTIONAL) {
                     this->optional[this->n_optional] = (char*)malloc(strlen(t) + 1);
-                    strcpy(this->optional[this->n_optional++], t);
+                    strcpy(this->optional[this->n_optional], t);
+                    if (current_level == 1)
+                        this->optional_group[this->n_optional] = current_optional;
+                    else
+                        this->optional_group[this->n_optional] = -1;
+                    this->n_optional++;
                 }
                 else if (in_block == B_PATTERN || in_block == B_CHAIN || in_block == B_FILTER || in_block == B_PREFIX || in_block == B_ORDER)
                 {
@@ -414,37 +427,41 @@ public:
     private:
 
     char *save_parsed_item(char **subject, char **predicate, char **object, char **datatype, char *lang, int operation, int in_block, int current_level, int *pos, int *status) {
-        if(subject == NULL || *subject == NULL) return NULL;
-//printf("Save parsed item %s - %s\n", *subject, *predicate);
         char *message = NULL;
         bool done = false;
-        if (in_block == B_PATTERN && *subject[0] && operation == OP_PUT) {
-            message = this->make_triple(subject, predicate, object, datatype, lang, status);
-            done = true;
+        if(subject == NULL) return NULL;
+//printf("Save parsed item %s - %s\n", *subject, *predicate);
+        if (*subject && *predicate) {
+            if (in_block == B_PATTERN && *subject[0] && operation == OP_PUT) {
+                message = this->make_triple(subject, predicate, object, datatype, lang, status, current_level);
+                done = true;
+            }
+            else if (in_block == B_PATTERN && *subject[0] && operation == OP_DELETE) {
+                message = this->delete_triple(subject, predicate, object, datatype, lang, status);
+                done = true;
+            }
+            else if (in_block == B_PATTERN && *subject[0] && operation == OP_GET) {
+                message = this->get_triple(subject, predicate, object, datatype, lang, status);
+                done = true;
+            }
+            else if (in_block == B_CHAIN && *subject[0] && operation == OP_GET) {
+                message = this->make_triple(subject, predicate, object, datatype, lang, status, current_level);
+                done = true;
+            }
+            else if (in_block == B_ORDER && *subject[0] && operation == OP_GET) {
+                message = this->save_order(*subject, *predicate, status);
+                done = true;
+            }
+            else if (in_block == B_PREFIX && (*subject[0] || *predicate[0])) {
+                message = this->make_prefix(*subject, *predicate, status);
+                done = true;
+            }
         }
-        else if (in_block == B_PATTERN && *subject[0] && operation == OP_DELETE) {
-            message = this->delete_triple(subject, predicate, object, datatype, lang, status);
-            done = true;
-        }
-        else if (in_block == B_PATTERN && *subject[0] && operation == OP_GET) {
-            message = this->get_triple(subject, predicate, object, datatype, lang, status);
-            done = true;
-        }
-        else if (in_block == B_CHAIN && *subject[0] && operation == OP_GET) {
-            message = this->make_triple(subject, predicate, object, datatype, lang, status);
-            done = true;
-        }
-        else if (in_block == B_ORDER && *subject[0] && operation == OP_GET) {
-            message = this->save_order(*subject, *predicate, status);
-            done = true;
-        }
-        else if (in_block == B_FILTER && *subject[0] && operation == OP_GET) {
-            message = this->save_filter(*subject, *predicate, *object, status, current_level);
-            done = true;
-        }
-        else if (in_block == B_PREFIX && (*subject[0] || *predicate[0])) {
-            message = this->make_prefix(*subject, *predicate, status);
-            done = true;
+        if (*subject) {
+            if (in_block == B_FILTER && *subject[0] && operation == OP_GET) {
+                message = this->save_filter(*subject, *predicate, *object, status, current_level);
+                done = true;
+            }
         }
         if(*subject) { free(*subject); *subject = NULL; }
         if(*predicate) { free(*predicate); *predicate = NULL; }
@@ -453,7 +470,7 @@ public:
         return message;
     }
 
-    char *make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status);
+    char *make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status, int current_level);
     char *delete_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status);
     char *get_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status);
     char *commit_delete(int *pip);

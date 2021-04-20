@@ -92,6 +92,7 @@ struct local_triple : indexable
     char *o;
     char *d;
     char l[8];
+    int _union;
 };
 
 struct triple : indexable
@@ -153,6 +154,7 @@ struct chain_variable
     int cond_o[32]; // reference to other variables (object)
     bool notexists; // there is filter condition indicating that this variable must have no values
     bool optional;  // this variable may have no values
+    int optional_group; // number of group of optional variables
 
     // Candidate objects (values)
     int n_cand;     // number of candidates

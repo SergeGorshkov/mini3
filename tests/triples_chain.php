@@ -108,6 +108,10 @@ $req = [    'RequestId' => '2',
 		[ 'Jack', 'lastVisit', '2021-04-12T15:24:45', 'xsd:datetime' ],
 		[ 'Jack', 'rdfs:label', 'Jack Doe', 'xsd:string', 'EN' ],
 		[ 'Jack', 'rdfs:label', 'Джек Доу', 'xsd:string', 'RU' ],
+		[ 'Jax', 'rdf:type', 'Programmer' ],
+		[ 'Jax', 'rdf:type', 'owl:NamedIndividual' ],
+		[ 'Jax', 'yearOfBirth', '1979', 'xsd:integer' ],
+		[ 'Jax', 'worksSince', '2019-01-18', 'xsd:date' ],
 		[ 'Jane', 'rdf:type', 'Person' ],
 		[ 'Jane', 'rdf:type', 'Programmer' ],
 		[ 'Jane', 'rdf:type', 'Designer' ],
@@ -243,7 +247,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '2',
+	[   'RequestId' => '3',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'rdfs:label', '?name' ],
@@ -252,7 +256,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '3',
+	[   'RequestId' => '4',
 	    'Chain' => [
                 [ '?lang', 'rdf:type', 'Language' ],
                 [ '?lang', '?property', '?name' ],
@@ -265,7 +269,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '6',
+	[   'RequestId' => '5',
 	    'Chain' => [
                 [ '?person1', 'rdf:type', 'Person' ],
                 [ '?person2', 'rdf:type', 'Person' ],
@@ -284,7 +288,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '7',
+	[   'RequestId' => '6',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'knows', '?lang1' ],
@@ -301,7 +305,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '8',
+	[   'RequestId' => '7',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'knows', '?lang1' ],
@@ -311,24 +315,27 @@ $tests = [
             ],
         ],
 
-	[   'RequestId' => '9',
+	[   'RequestId' => '8',
 	    'Chain' => [
                 [ '?programmer', 'rdfs:subClassOf', 'Person' ],
                 [ '?person', 'rdf:type', '?programmer' ],
                 [ '?person', 'rdfs:label', '?name' ],
 		[ '?person', 'yearOfBirth', '?year' ],
+		[ '?person', 'worksSince', '?works' ],
                 [ '?person', 'knows', '?lang' ],
                 [ '?lang', 'rdfs:label', '?namelang' ],
                 [ '?subclass', 'rdfs:subClassOf', 'Person' ],
                 [ '?person2', 'rdf:type', '?subclass' ],
                 [ '?person2', 'rdfs:label', '?name2' ],
-		[ '?person2', 'yearOfBirth', '?year2' ],
+                [ '?person2', 'knows', '?lang2' ],
+		[ '?person2', 'yearOfBirth', '?year' ],
+		[ '?person2', 'worksSince', '?works2' ],
             ],
-	    'Optional' => [ '?subclass', '?person2', '?year2' ],
+	    'Optional' => [ ['?lang2', '?name2'] ],
             'Filter' => [
         	'and',
         	[ 'and',
-        	    [ '?year', 'more', '?year2' ]
+        	    [ '?works2', 'more', '?works' ]
         	]
             ]
         ],
@@ -349,8 +356,8 @@ $answers = [
 	      'numRecords' => 14 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF', '?visit', '?since', '?year'  ],
-	        [ '?person' => 'http://localhost/Jill', '?name' => 'Jill Doe', '?project' => 'http://localhost/DEF, '?visit', '?since', '?year'' ] ],
+	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF', '?visit' => '2021-04-12T15:24:45', '?since' => '2015-05-23', '?year'=> '1979' ],
+	        [ '?person' => 'http://localhost/Jill', '?name' => 'Jill Doe', '?project' => 'http://localhost/DEF', '?visit' => '2021-04-12T15:28:12', '?since' => '2015-05-18', '?year' => '1990' ] ],
 	      'numRecords' => 0 ],
 
 	    [ 'hasResult' =>
@@ -373,22 +380,27 @@ $answers = [
 	      'numRecords' => 12 ],
 
 	    [ 'hasResult' => 
-	      [ [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/PHP', '?name1' => 'PHP', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ],
-	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/C++', '?name1' => 'C++', '?project' => 'http://localhost/DEF', '?lang2' => 'http://localhost/PHP', '?name2' => 'PHP' ],
-	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/JavaScript', '?name1' => 'JavaScript', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ] ],
+	      [ [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/C++', '?name1' => 'C++', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ],
+	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/PHP', '?name1' => 'PHP', '?project' => 'http://localhost/DEF', '?lang2' => 'http://localhost/PHP', '?name2' => 'PHP' ],
+	        [ '?person' => 'http://localhost/Jane', '?lang1' => 'http://localhost/C++', '?name1' => 'C++', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ] ],
 	      'numRecords' => 6 ],
 
 	    [ 'hasResult' =>
-	      [ [ '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?year' => '1979', '?lang' => 'http://localhost/PHP', '?subclass' => 'http://localhost/Designer', '?persons2' => 'http://localhost/Jill', '?name2' => 'Jill Doe', '?year2' => '1990', '?namelang' => 'PHP' ],
-	        [ '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jane', '?name' => 'Jane Doe', '?year' => '1985', '?lang' => 'http://localhost/C++', '?subclass' => 'http://localhost/Designer', '?persons2' => 'http://localhost/Jack', '?name2' => 'Jack Doe', '?year2' => '1979', '?namelang' => 'C++' ] ],
-	      'numRecords' => 16 ]
+	      [ [ '?project' => 'http://localhost/ABC', '?person' => 'http://localhost/Jack', '?name1' => 'C++', '?lang1' => 'http://localhost/C++', '?lang2' => 'http://localhost/C++' ],
+	        [ '?project' => 'http://localhost/DEF', '?person' => 'http://localhost/Jack', '?name1' => 'C++', '?lang1' => 'http://localhost/C++', '?lang2' => 'http://localhost/PHP' ] ],
+	      'numRecords' => 16 ],
+
+	    [ 'hasResult' =>
+	      [ [ 
+	      '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?year' => '1979', '?lang' => 'http://localhost/PHP', '?subclass' => 'http://localhost/Programmer', '?person2' => 'http://localhost/Jax', '?namelang' => 'PHP', '?works' => '2015-05-23','?works2' => '2019-01-18', '?name2' => '', '?lang2' => '' ] ],
+	      'numRecords' => 12 ]
 
 	];
 
 
 echo("\n5. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if( $ind != 5 ) continue;
+if( $ind == 2 ) continue;
 	echo("\n" . ($ind + 1) . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );
@@ -397,7 +409,6 @@ if( $ind != 5 ) continue;
 		echo("ERROR!");
 		continue;
 	}
-	echo(" ".round($et-$st,3)."\n");
 
 	$error = false;
 	foreach( $answers[ $ind ][ 'hasResult' ] as $result ) {
@@ -448,7 +459,8 @@ if( $ind != 5 ) continue;
 		}
 	}
 	else
-		echo(" OK\n");
+		echo(" OK");
+	echo(" ".round($et-$st,3)."\n");
 }
 
 ?>

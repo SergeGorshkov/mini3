@@ -28,7 +28,7 @@
             *status = -1;
             return message;
         }
-//printf("%i %s - %s - %s\n", current_level, subject, predicate, object);
+//printf("filter %i %s - %s - %s\n", current_level, subject, predicate, object);
         // Filters grouping
         if(current_level > 0) {
             if(this->current_filter_group[current_level - 1] == -1) {
@@ -446,7 +446,7 @@
         for (int i = 0; i < this->_n_triples; i++)
         {
             int ics = find_cond(this->_triples[i].s);
-//printf("%s\n", this->_triples[i].s);
+printf("%s (%i)\n", this->_triples[i].s, this->_triples[i]._union);
             if (ics == -1)
                 ics = add_cond(this->_triples[i].s);
             int icp = find_cond(this->_triples[i].p);
@@ -477,8 +477,10 @@
         // Mark optional variables
         for (int i = 0; i < this->n_optional; i++) {
             for (int j = 0; j < this->n_var; j++) {
-                if (strcmp(this->optional[i], this->var[j].obj) == 0)
+                if (strcmp(this->optional[i], this->var[j].obj) == 0) {
                     this->var[j].optional = true;
+                    this->var[j].optional_group = this->optional_group[i];
+                }
             }
         }
         // Find variables dependence to define the variables resolution order
@@ -605,7 +607,7 @@ for(int x=0; x<n; x++) {
     int i = order[x];
     if(this->var[i].obj[0] != '?' && this->var[i].n == 0)
         continue;
-    printf("%i:\t%s, dep = %i, optional = %i, notexists = %i\n", i, this->var[i].obj, this->var[i].dep, this->var[i].optional, this->var[i].notexists);
+    printf("%i:\t%s, dep = %i, optional = %i, optional_group = %i, notexists = %i\n", i, this->var[i].obj, this->var[i].dep, this->var[i].optional, this->var[i].optional_group, this->var[i].notexists);
     for(int j=0; j<this->var[i].n; j++)
         printf("\t\t%s => %s\n", this->var[i].cond_p[j] == -1 ? "relation" : ( this->var[i].cond_p[j] == -2 ? relation_value : this->var[this->var[i].cond_p[j]].obj), this->var[this->var[i].cond_o[j]].obj);
     if(this->var[i].n_dep_of) {
@@ -884,6 +886,9 @@ for (int x = 0; x < n; x++)
 /*
 printf("\nCombinations:\n");
 for (int x = 0; x < this->n_pcv; x++) {
+    printf("%i. ", x);
+    if (this->pre_comb_value[x][0] == NULL)
+        printf("(deleted)");
     for (int l = 0; l < this->n_var; l++) {
         if (this->pre_comb_value[x][l])
             printf("%s%s = %s", (l!=0?", ":""), this->var[l].obj, this->pre_comb_value[x][l]);
@@ -1082,7 +1087,7 @@ for (int x = 0; x < this->n_pcv; x++) {
 //printf("Result of filter %i: %s\n", i, (result?"true":"false"));
             }
             // Now let us check filters combinations
-//printf("incomplete: %i, nfg: %i\n", incomplete, this->_n_filter_groups);
+//printf("filter is incomplete: %i, n_filter_groups: %i\n", incomplete, this->_n_filter_groups);
             if(!incomplete && this->_n_filter_groups > 0) {
                 bool resolved;
                 int iterations = 1;
@@ -1161,7 +1166,19 @@ for (int x = 0; x < this->n_pcv; x++) {
                     this->pre_comb_value[z][0] = NULL;
             }
         }
-
+/*
+printf("\nFiltered combinations:\n");
+for (int x = 0; x < this->n_pcv; x++) {
+    printf("%i. ", x);
+    if (this->pre_comb_value[x][0] == NULL)
+        printf("(deleted)");
+    for (int l = 0; l < this->n_var; l++) {
+        if (this->pre_comb_value[x][l])
+            printf("%s%s = %s", (l!=0?", ":""), this->var[l].obj, this->pre_comb_value[x][l]);
+    }
+    printf("\n\n");
+}
+*/
         // Output complete combinations
         char vars[1024 * N_MAX_VARIABLES], *result;
         bool first = true, first_val = true;
@@ -1172,8 +1189,19 @@ for (int x = 0; x < this->n_pcv; x++) {
             bool complete = true;
             for (int x = 0; x < n; x++) {
                 int i = order[x];
-                if (this->var[i].notexists || this->var[i].optional)
+                if (this->var[i].notexists)
                     continue;
+                if (this->var[i].optional) {
+                    if (this->var[i].optional_group == -1)
+                        continue;
+                    bool all_group_empty = true;
+                    for (int y = 0; y < n; y++) {
+                        if (this->var[y].optional && this->var[y].optional_group == this->var[i].optional_group && this->pre_comb_value[z][y] != NULL)
+                            all_group_empty = false;
+                    }
+                    if (all_group_empty)
+                        continue;
+                }
                 if (this->var[i].obj[0] != '?')
                     continue;
                 if (this->pre_comb_value[z][i] == NULL) {
@@ -1280,11 +1308,9 @@ for (int x = 0; x < this->n_pcv; x++) {
             if (!first)
                 strcat(vars, ", ");
             first = false;
-//printf("%s\t", this->var[i].obj);
             sprintf((char *)((unsigned long)vars + strlen(vars)), "\"%s\"", this->var[i].obj);
         }
         strcat(vars, "] ");
-//printf("\n");
         first = true;
         int sent = 0;
         for (int z = 0; z < this->n_pcv; z++) {
@@ -1302,13 +1328,14 @@ for (int x = 0; x < this->n_pcv; x++) {
                     continue;
                 if (this->var[i].obj[0] != '?')
                     continue;
-//printf("%s\t", this->pre_comb_value[z][i]);
                 if (!first_val)
                     strcat(result, ", ");
                 first_val = false;
-                sprintf((char *)((unsigned long)result + strlen(result)), "[\"%s\", \"%s\", \"%s\"]", this->pre_comb_value[z][i], this->pre_comb_value_type[z][i] ? this->pre_comb_value_type[z][i] : "", this->pre_comb_value_lang[z][i] ? this->pre_comb_value_lang[z][i] : "");
+                if (this->pre_comb_value[z][i] == NULL)
+                    sprintf((char *)((unsigned long)result + strlen(result)), "[\"\", \"\", \"\"]");
+                else
+                    sprintf((char *)((unsigned long)result + strlen(result)), "[\"%s\", \"%s\", \"%s\"]", this->pre_comb_value[z][i], this->pre_comb_value_type[z][i] ? this->pre_comb_value_type[z][i] : "", this->pre_comb_value_lang[z][i] ? this->pre_comb_value_lang[z][i] : "");
             }
-//printf("\n");
             strcat(result, "]");
         }
         strcat(result, "] ");
@@ -1317,7 +1344,6 @@ for (int x = 0; x < this->n_pcv; x++) {
         char *answer = (char *)malloc(1024 + strlen(vars) + strlen(result));
         if(!answer) utils::out_of_memory();
         sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", %s, %s}", reqid, vars, result);
-//printf(answer);
         free(result);
         return answer;
     }

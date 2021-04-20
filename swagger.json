@@ -589,7 +589,7 @@
           },
 	  "Optional": {
 	    "type": "array",
-	    "description": "Array of the names of the optional variables",
+	    "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values).",
 	    "items": {
 	      "type": "string"
 	    }

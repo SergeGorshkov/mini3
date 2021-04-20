@@ -1,4 +1,4 @@
-    char *request::make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status)
+    char *request::make_triple(char **subject, char **predicate, char **object, char **datatype, char *lang, int *status, int current_level)
     {
         char *message;
 //printf("Make triple %s - %s - %s - %s - %s\n", *subject, *predicate, *object, *datatype, lang);
@@ -22,6 +22,7 @@
             return message;
         }
         memset(&this->_triples[this->_n_triples], 0, sizeof(triple));
+        this->_triples[this->_n_triples]._union = -1;
         this->_triples[this->_n_triples].s = (char *)malloc(strlen(*subject) + 1);
         if(!this->_triples[this->_n_triples].s) utils::out_of_memory();
         strcpy(this->_triples[this->_n_triples].s, *subject);
@@ -51,6 +52,8 @@
         SHA1((unsigned char *)data, strlen(data), this->_triples[this->_n_triples].hash);
         free(data);
         this->_triples[this->_n_triples].mini_hash = triples_index::get_mini_hash(this->_triples[this->_n_triples].hash);
+        if (current_union != -1 && current_level == 3)
+            this->_triples[this->_n_triples]._union = current_union;
         this->_n_triples++;
         return NULL;
     };
