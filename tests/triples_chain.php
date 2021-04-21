@@ -179,40 +179,6 @@ if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
 
-$req = [    'RequestId' => '3',
-	    'Chain' => [
-                [ [ [ '?person', 'rdf:type', 'Programmer' ],
-                    [ '?person', 'knows', '?language' ] ],
-                  [ [ '?person', 'rdf:type', 'Designer' ] ]
-                ],
-                [ '?person', 'rdfs:label', '?name' ],
-            ],
-            'Optional' => [ '?language' ]
-            ];
-/*
-echo("3. GET chain\n");
-$st = microtime(true);
-$res = request('GET', 'chain', $req );
-$et = microtime(true);
-if($res->Status == 'Ok') echo("OK");
-else echo("ERROR!");
-echo(" ".round($et-$st,3)."\n");
-//print_r($res);
-//exit;
-
-// Print table
-foreach($res->Vars as $rr) {
-    echo($rr."\t");
-}
-echo("\n");
-foreach($res->Result as $rr) {
-    foreach($rr as $r) {
-	echo($r[0]."\t");
-    }
-    echo("\n");
-}
-exit;
-*/
 $tests = [
 
 	[   'RequestId' => '0',
@@ -388,6 +354,150 @@ $tests = [
             ],
         ],
 
+	[   'RequestId' => '13',
+	    'Chain' => [
+                [ '?person', 'knows', '?lang' ],
+            ],
+	    'Order' => [ [ '?lang', 'asc' ] ],
+	    'Limit' => 1,
+	    'Offset' => 2
+        ],
+
+	[   'RequestId' => '14',
+	    'Chain' => [
+                [ '?object', 'rdfs:label', '?name' ],
+            ],
+	    'Order' => [ [ '?name', 'asc' ] ],
+	    'Limit' => 1,
+	    'Offset' => 2
+        ],
+
+	[   'RequestId' => '15',
+	    'Chain' => [
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?name', 'contains', 'Ja' ]
+        	]
+            ]
+        ],
+
+	[   'RequestId' => '16',
+	    'Chain' => [
+                [ '?person', 'knows', 'C++' ],
+            ],
+        ],
+
+	[   'RequestId' => '17',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', '?predicate', 'C++' ],
+            ],
+        ],
+
+	[   'RequestId' => '18',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?name', 'iequal', 'jack doe' ]
+        	]
+            ]
+        ],
+
+	[   'RequestId' => '19',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'or',
+        	    [ '?name', 'iequal', 'jane' ],
+        	    [ '?name', 'iequal', 'jack' ]
+        	]
+            ]
+        ],
+
+	[   'RequestId' => '20',
+	    'Chain' => [
+                [ '?project', 'rdf:type', 'Project' ],
+                [ '?project', 'writtenOn', '?language' ],
+                [ '?language', 'isKnownBy', '?person' ],
+            ],
+        ],
+
+	[   'RequestId' => '21',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+	    'Order' => [ [ '?name', 'asc' ] ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?name', 'contains', 'Ja' ]
+        	]
+            ],
+	    'Limit' => 1,
+	    'Offset' => 2
+        ],
+
+	[   'RequestId' => '22',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', 'knows', '?lang' ],
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?lang', 'notexists' ]
+        	]
+            ],
+        ],
+
+	[   'RequestId' => '23',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+                [ '?person', '?predicate', 'ABC' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?predicate', 'notexists' ]
+        	]
+            ],
+        ],
+
+	[   'RequestId' => '24',
+	    'Chain' => [
+                [ '?person', 'rdf:type', 'Person' ],
+		[ [ [ '?project', 'rdf:type', 'Project' ],
+                    [ '?person', '?predicate', '?project' ] ],
+		  [ [ '?software', 'rdf:type', 'Software' ],
+                    [ '?person', '?predicate', '?software' ] ] ],
+            ],
+	    'Optional' => [ 'Software', 'Project' ]
+        ],
+
+	[   'RequestId' => '25',
+	    'Chain' => [
+                [ '?a', '?b', '?c' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?c', 'icontains', 'ja' ]
+        	]
+            ]
+        ],
+
 ];
 
 $answers = [
@@ -460,14 +570,70 @@ $answers = [
 	    [ 'hasResult' => // 12
 	      [ [ 
 	      '?subject' => 'http://localhost/Jack', '?predicate' => 'http://localhost/knows' ] ],
-	      'numRecords' => 621 ],
+	      'numRecords' => 4 ],
+
+	    [ 'hasResult' => // 13
+	      [ [ '?person' => 'http://localhost/Jack', '?lang' => 'http://localhost/JavaScript' ] ],
+	      'numRecords' => 1 ],
+
+	    [ 'hasResult' => // 14
+	      [ [ '?object' => 'http://localhost/Compilable', '?name' => 'Compilable' ] ],
+	      'numRecords' => 1 ],
+
+	    [ 'hasResult' => // 15
+	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe' ],
+		[ '?person' => 'http://localhost/Jane', '?name' => 'Jane Doe' ] ],
+	      'numRecords' => 3 ],
+
+	    [ 'hasResult' => // 16
+	      [ [ '?person' => 'http://localhost/Jack' ],
+		[ '?person' => 'http://localhost/Jane' ] ],
+	      'numRecords' => 2 ],
+
+	    [ 'hasResult' => // 17
+	      [ [ '?person' => 'http://localhost/Jack', '?predicate' => 'http://localhost/knows' ],
+		[ '?person' => 'http://localhost/Jane', '?predicate' => 'http://localhost/knows' ] ],
+	      'numRecords' => 2 ],
+
+	    [ 'hasResult' => // 18
+	      [ [ '?person' => 'http://localhost/Jack' ] ],
+	      'numRecords' => 1 ],
+
+	    [ 'hasResult' => // 19
+	      [ [ '?person' => 'http://localhost/Jane' ] ],
+	      'numRecords' => 2 ],
+
+	    [ 'hasResult' => // 20
+	      [ [ '?project' => 'http://localhost/ABC', '?language' => 'http://localhost/C++', '?person' => 'http://localhost/Jane' ] ],
+	      'numRecords' => 4 ],
+
+	    [ 'hasResult' => // 21
+	      [ [ '?person' => 'http://localhost/Jax', '?name' => 'Jax' ] ],
+	      'numRecords' => 1 ],
+
+	    [ 'hasResult' => // 22
+	      [ [ '?person' => 'http://localhost/Jill', '?name' => 'Jill' ] ],
+	      'numRecords' => 1 ],
+
+	    [ 'hasResult' => // 23
+	      [ [ '?person' => 'http://localhost/Jill' ] ],
+	      'numRecords' => 2 ],
+
+	    [ 'hasResult' => // 24
+	      [ [ '?person' => 'http://localhost/Jill', '?predicate' => 'usesSoftware', '?software' => 'http://localhost/Photoshop' ],
+		[ '?person' => 'http://localhost/Jack', '?predicate' => 'participatesIn', '?project' => 'http://localhost/ABC' ] ],
+	      'numRecords' => 4 ],
+
+	    [ 'hasResult' => // 25
+	      [ [ '?a' => 'http://localhost/Jack', '?b' => 'rdfs:label', '?software' => 'Jack' ] ],
+	      'numRecords' => 5 ],
 
 	];
 
-
 echo("\n3. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if( $ind != 12 ) continue;
+if( $ind != 18 ) continue;
+//print_r($test);
 	echo(($ind + 1) . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );

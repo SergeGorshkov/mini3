@@ -223,7 +223,7 @@
         return this->var[j].n_cand - 1;
     }
 
-    // Add solution from the i-th variable to the j-th. Cand (source) is the i'th variable candidate, sol (target) is j'th variable candidate
+    // Add solution from the i-th variable to the j-th. Cand (source) is the i-th variable candidate, sol (target) is j-th variable candidate
     void request::add_solution(int i, int j, int cand, int sol, int bearer) {
 //printf("\tadd solution: from var %i cand %i = %s to var %i cand %i = %s, bearer = %i\n", i, cand, this->var[i].cand[cand], j, sol, this->var[j].cand[sol], bearer);
         if (!this->var[i].solution[j]) {
@@ -245,6 +245,7 @@
             }
         }
         bool found = false;
+        // Check if solution is unique
         for (int k=0; k<this->var[i].n_sol[j]; k++) {
             if (this->var[i].solution_cand[j][k] == cand && this->var[i].solution[j][k] == sol) {
                 if (bearer != -1 && this->var[i].bearer) {
@@ -261,15 +262,20 @@
         if(bearer != -1)
             this->var[i].bearer[j][ this->var[i].n_sol[j] ] = bearer;
         this->var[i].n_sol[j]++;
-//printf("\tadded solution_%i to variable %i, bearer = %i, n_sol = %i\n", j, i, bearer, this->var[i].n_sol[j]);
+//printf("\tadded solution_%i to variable %i, bearer = %i, n_sol = %i, sol = %i, cand = %i\n", j, i, bearer, this->var[i].n_sol[j], sol, cand);
     }
 
     // Fill candidate objects (values) array for j-th variable using its linkage from i-th variable
     bool request::get_candidates(int i, int i_cond, int j, int cand_subject, char *subject, char *predicate, char *object, bool negative, int bearer)
     {
-        unsigned long n = 0;
+        unsigned long n = 0, *res;
 //printf("\nFind %s - %s - %s for i = %i, j = %i, cand = %i, bearer = %i\n", subject, predicate, object, i, j, cand_subject, bearer);
-        unsigned long *res = triples_index::find_matching_triples(subject, predicate, object, NULL, NULL, &n);
+        if (strcmp(predicate, "relation") == 0)
+            res = triples_index::find_matching_triples(subject, "*", object, NULL, NULL, &n);
+        else if (strcmp(predicate, "relation_value") == 0)
+            return false;
+        else
+            res = triples_index::find_matching_triples(subject, predicate, object, NULL, NULL, &n);
 //printf("found %i items\n", n);
         if (negative) {
             free(res);
@@ -283,7 +289,7 @@
                 add_candidate(i, i_cond, utils::get_string(triples[res[k]].s_pos), NULL, NULL);
             else if (predicate[0] == '*') {
                 int ind_cand = add_candidate(j, i_cond, utils::get_string(triples[res[k]].p_pos), NULL, NULL);
-//printf("predicate = %s, i = %i\n", utils::get_string(triples[res[k]].p_pos), i);
+//printf("predicate = %s, ind_cand = %i\n", utils::get_string(triples[res[k]].p_pos), ind_cand);
                 if (i >= 0 && ind_cand > -1)
                     add_solution(i, j, cand_subject, ind_cand, bearer);
             }
@@ -329,7 +335,7 @@
 
     // Recursively build combinations for the i-th variable, id candidate
     void request::build_combination(int i, int id, int *comb, int ind_cond, int bearer) {
-//printf("Build combinations for %s, %s, cond %i\n", this->var[i].obj, this->var[i].cand[id], ind_cond);
+//printf("BC Build combinations for %s, %s, cond %i\n", this->var[i].obj, this->var[i].cand[id], ind_cond);
         if(this->var[ this->var[i].cond_o[ind_cond] ].obj[0] != '?') {
             if(ind_cond > this->var[i].n - 1)
                 this->push_combination(i, comb);
@@ -348,17 +354,17 @@
             }
         }
         int value_var = this->var[i].cond_o[ind_cond];
-//printf("value_var = %s, %i solutions\n", this->var[value_var].obj, this->var[i].n_sol[value_var]);
+//printf("BC value_var = %s, %i solutions\n", this->var[value_var].obj, this->var[i].n_sol[value_var]);
         // For the predicate variables
         if (relation) {
             if (this->var[i].n_sol[value_var] > 0) {
-//printf("value_var = %i, dependent of = %i, dependent_cond = %i\n", value_var, this->var[i].dependent_of[0], dependent_cond);
+//printf("BC value_var = %i, dependent of = %i, dependent_cond = %i\n", value_var, this->var[i].dependent_of[0], dependent_cond);
                 for (int j = 0; j < this->var[i].n_sol[value_var]; j++) {
-//printf("Build for solution (rel) %s = %s, id = %i of variable %i, bearer is %i\n", this->var[value_var].obj, this->var[value_var].cand[ this->var[i].solution[value_var][j] ], id, i, bearer);
+//printf("BC Build for solution (rel) %s = %s, id = %i of variable %i, bearer is %i\n", this->var[value_var].obj, this->var[value_var].cand[ this->var[i].solution[value_var][j] ], id, i, bearer);
                     if (this->var[i].solution[value_var][j] >= 0 && this->var[value_var].n_cand > this->var[i].solution[value_var][j]) {
                         if (bearer != -1 && this->var[i].bearer) {
                             if (this->var[i].bearer[ value_var ][j] == bearer) {
-//printf("Bearer this->var[%i].bearer[ %i ][%i] = %i, bearer match: %s = %s, %s = %s\n", i, value_var, j, this->var[i].bearer[ value_var ][j], this->var[i].obj, this->var[i].cand[this->var[i].solution_cand[value_var][j]], this->var[value_var].obj, this->var[value_var].cand[this->var[i].solution[value_var][j]]);
+//printf("BC Bearer this->var[%i].bearer[ %i ][%i] = %i, bearer match: %s = %s, %s = %s\n", i, value_var, j, this->var[i].bearer[ value_var ][j], this->var[i].obj, this->var[i].cand[this->var[i].solution_cand[value_var][j]], this->var[value_var].obj, this->var[value_var].cand[this->var[i].solution[value_var][j]]);
                                 comb[i] = this->var[i].solution_cand[value_var][j];
                                 comb[value_var] = this->var[i].solution[value_var][j];
                             }
@@ -384,6 +390,8 @@
                 // Cycle through the solutions to the target variable from the current candidate object
                 for (int j = 0; j < this->var[i].n_sol[value_var]; j++) {
                     if (this->var[i].solution_cand[value_var][j] != id) continue;
+                    if (this->var[value_var].cand[this->var[i].solution[value_var][j]] == 0)
+                        continue;
                     comb[value_var] = this->var[i].solution[value_var][j];
                     found = true;
                     if(ind_cond > this->var[i].n - 1)
@@ -550,6 +558,7 @@
         for (int x = 0; x < n; x++)
         {
             int i = order[x];
+//printf("Find value for %i\n", x);
             char *subject = this->var[i].obj;
             // Cycle the conditions on some subject
             for (int j = 0; j < this->var[i].n; j++)
@@ -559,27 +568,32 @@
 //printf("\nCondition from %i to %i, j = %i. Subject = %s, %i candidates\n", i, this->var[i].cond_o[j], j, subject, this->var[i].n_cand);
                 if (subject[0] == '?') 
                 {
+                    bool match = false;
                     // If there is no candadates OR the current condition is in UNION clause, then we probably can find new candidates - fo scan for them.
                     if (this->var[i].n_cand == 0 || this->var[i].cond_union[j] != -1)
-                        bool match = get_candidates(i, j, this->var[i].cond_o[j], 0, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists, -1);
-                    int limit_cand = this->var[i].n_cand;
+                        match = get_candidates(i, j, this->var[i].cond_o[j], 0, subject[0] == '?' ? star : subject, predicate[0] == '?' ? star : predicate, object[0] == '?' ? star : object, this->var[i].notexists, -1);
+                    int limit_cand = this->var[i].n_cand; // Number of candidates for the current variable. Saved to avoid checking new candidates added in this cycle.
 //printf("=== There are %i candidates, predicate = %s\n", limit_cand, predicate);
                     for (int l = 0; l < limit_cand; l++) {
                         if (this->var[i].cand[l] == NULL) continue;
-                        bool match;
                         if (predicate == relation) {
                             match = get_candidates(i, j, this->var[i].cond_o[j], l, this->var[i].cand[l], object[0] == '?' ? star : object, star, this->var[this->var[i].cond_o[j]].notexists, -1);
                         }
                         else if (predicate == relation_value) {
-//printf("dependent of %i variables\n", this->var[i].n_dep_of);
+//printf("===========\ndependent of %i variables\n", this->var[i].n_dep_of);
                             for (int n = 0; n < this->var[i].n_dep_of; n++) {
                                 int dep_of = this->var[i].dependent_of[n];
                                 int limit = this->var[dep_of].n_sol[i];
+                                bool found = false;
                                 for (int m = 0; m < limit; m++) {
                                     if (l != this->var[dep_of].solution[i][m]) continue;
 //printf("m = %i: Parent candidate (bearer) is %s\n", m, this->var[dep_of].cand[ this->var[dep_of].solution_cand[i][m] ]);
                                     match = get_candidates(i, j, this->var[i].cond_o[j], l, this->var[dep_of].cand[ this->var[dep_of].solution_cand[i][m] ], this->var[i].cand[l], object[0] == '?' ? star : object, this->var[this->var[i].cond_o[j]].notexists, this->var[dep_of].solution_cand[i][m]);
+                                    if (match)
+                                        found = true;
                                 }
+                                if ((!found && !this->var[ this->var[i].cond_o[j] ].notexists) || (found && this->var[ this->var[i].cond_o[j] ].notexists))
+                                    this->var[i].cand[l] = NULL;
                             }
                         }
                         else
@@ -655,11 +669,14 @@ for(int x=0; x<n; x++) {
         if(this->var[i].n_sol[k] == 0) continue;
         printf("\t\t%s: %i\n", this->var[k].obj, this->var[i].n_sol[k]);
         for(int j=0; j<this->var[i].n_sol[k]; j++) {
-            printf("\t\t\t%s\t", this->var[i].cand[ this->var[i].solution_cand[k][j] ]);
             if(this->var[i].solution[k][j] >= 0 && this->var[k].n_cand > this->var[i].solution[k][j]) {
-                if(this->var[k].cand[ this->var[i].solution[k][j] ])
-                    printf("%s", this->var[k].cand[ this->var[i].solution[k][j] ]);
+                if(this->var[k].cand[ this->var[i].solution[k][j] ]) {
+                    printf("\t\t\t%s\t", this->var[i].cand[ this->var[i].solution_cand[k][j] ]);
+                    printf("%s", this->var[k].cand[ this->var[i].solution[k][j] ] );
+                }
+                else continue;
             }
+            else continue;
             if(this->var[i].bearer[k]) {
                 if(this->var[i].bearer[k][j] != -1)
                     printf(" (%s)", this->var[ this->var[i].dependent_of[0] ].cand[ this->var[i].bearer[k][j] ]);
@@ -707,6 +724,7 @@ for(int i=0; i<this->_n_filters; i++) {
                 int dep = this->var[i].dependent_of[0];
 //printf("Variable %i has %i candidates\n", dep, this->var[dep].n_cand);
                 for (int y = 0; y < this->var[dep].n_cand; y++) {
+                    if (this->var[dep].cand[y] == 0) continue;
                     int combination[N_MAX_VARIABLES];
                     memset(&combination, -1, sizeof(int)*N_MAX_VARIABLES);
                     combination[dep] = y; // Put source object (bearer) to the combination
@@ -736,7 +754,6 @@ for(int i=0; i<this->_n_filters; i++) {
                         if (!found) break;
 //printf("Go build combinations for variable %i and predicate %i, while bearer is %i\n", i, this->var[dep].solution[i][z], dep, y);
                         build_combination(i, this->var[dep].solution[i][z], combination, 0, y);
-//                        combination[i] = this->var[dep].solution[i][z];
                     }
                 }
             }
