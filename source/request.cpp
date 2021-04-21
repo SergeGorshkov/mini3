@@ -486,13 +486,13 @@ public:
     char *save_filter(char *subject, char *predicate, char *object, int *status, int current_level);
     char *save_order(char *subject, char *object, int *status);
     char *return_triples(void);
-    int find_cond(char *obj);
-    int add_cond(char *obj);
+    int find_var(char *obj);
+    int add_var(char *obj);
     void propagate_dependent(int i, int dep);
     bool check_candidate_match(char *s, char *predicate, int cond_o);
-    int add_candidate(int j, char *s, char *datatype, char *lang);
+    int add_candidate(int j, int i_cond, char *s, char *datatype, char *lang);
     void add_solution(int i, int j, int cand, int sol, int bearer);
-    bool get_candidates(int i, int j, int cand_subject, char *subject, char *predicate, char *object, bool negative, int bearer);
+    bool get_candidates(int i, int i_cond, int j, int cand_subject, char *subject, char *predicate, char *object, bool negative, int bearer);
     void push_combination(int i, int *comb);
     void build_combination(int i, int id, int *comb, int ind_cond, int bearer);
     void global_push_combination(int i, int j);

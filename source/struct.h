@@ -150,8 +150,9 @@ struct chain_variable
 
     // Conditions - relations to another variables
     int n;          // number of conditions
-    int cond_p[32]; // reference to other variables (predicate)
-    int cond_o[32]; // reference to other variables (object)
+    int cond_p[N_MAX_VARIABLES]; // reference to other variables (predicate)
+    int cond_o[N_MAX_VARIABLES]; // reference to other variables (object)
+    int cond_union[N_MAX_VARIABLES]; // contains the number of conditions group (UNION) or -1 if not in group
     bool notexists; // there is filter condition indicating that this variable must have no values
     bool optional;  // this variable may have no values
     int optional_group; // number of group of optional variables
@@ -166,13 +167,13 @@ struct chain_variable
 
     // Dependent of variables
     int n_dep_of;
-    int dependent_of[32];
+    int dependent_of[N_MAX_VARIABLES];
 
     // Solutions from this variable to dependent ones
-    int *solution[32]; // first index is the dependent variable index, value is its candidate object index
-    int *solution_cand[32]; // source candidate object index (of this variable's candidates)
-    int *bearer[32]; // for the predicate variables: bearer is the object which possess this predicate's value
-    int n_sol[32];  // number of solutions to each dependent variable
+    int *solution[N_MAX_VARIABLES]; // first index is the dependent variable index, value is its candidate object index
+    int *solution_cand[N_MAX_VARIABLES]; // source candidate object index (of this variable's candidates)
+    int *bearer[N_MAX_VARIABLES]; // for the predicate variables: bearer is the object which possess this predicate's value
+    int n_sol[N_MAX_VARIABLES];  // number of solutions to each dependent variable
 
     // Combinations from this variable to dependent ones
     int n_comb;     // number of combinations

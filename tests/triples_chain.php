@@ -161,10 +161,13 @@ $req = [    'RequestId' => '2',
 		[ 'ABC', 'rdf:type', 'Project' ],
 		[ 'ABC', 'writtenOn', 'C++' ],
 		[ 'ABC', 'rdf:type', 'owl:NamedIndividual' ],
+		[ 'ABC', 'rdfs:label', 'ABC', 'xsd:string' ],
 		[ 'Jack', 'participatesIn', 'ABC' ],
 		[ 'Jane', 'participatesIn', 'ABC' ],
 		[ 'DEF', 'rdf:type', 'Project' ],
+		[ 'DEF', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'DEF', 'writtenOn', 'PHP' ],
+		[ 'DEF', 'rdfs:label', 'DEF', 'xsd:string' ],
 		[ 'DEF', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'Jack', 'participatesIn', 'DEF' ]
             ]
@@ -175,24 +178,18 @@ $res = request( 'PUT', 'triple', $req );
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
-/*
+
 $req = [    'RequestId' => '3',
 	    'Chain' => [
-                [ '?person1', 'rdf:type', 'Person' ],
-                [ '?person1', 'worksSince', '?works1' ],
-                [ '?person1', 'lastVisit', '?visit1' ],
-                [ '?person2', 'rdf:type', 'Person' ],
-                [ '?person2', 'worksSince', '?works2' ],
-                [ '?person2', 'lastVisit', '?visit2' ],
+                [ [ [ '?person', 'rdf:type', 'Programmer' ],
+                    [ '?person', 'knows', '?language' ] ],
+                  [ [ '?person', 'rdf:type', 'Designer' ] ]
+                ],
+                [ '?person', 'rdfs:label', '?name' ],
             ],
-            'Filter' => [
-        	'and',
-        	[ 'and',
-        	    [ '?visit1', 'more', '2021-04-12T14:00:00' ]
-        	]
-            ]
+            'Optional' => [ '?language' ]
             ];
-
+/*
 echo("3. GET chain\n");
 $st = microtime(true);
 $res = request('GET', 'chain', $req );
@@ -216,7 +213,6 @@ foreach($res->Result as $rr) {
 }
 exit;
 */
-
 $tests = [
 
 	[   'RequestId' => '0',
@@ -241,10 +237,11 @@ $tests = [
                 [ '?person', 'worksSince', '?since' ],
                 [ '?person', 'lastVisit', '?visit' ],
                 [ '?person', 'yearOfBirth', '?year' ],
-                [ '?person', 'participatesIn', '?project' ],
-                [ [ '?person', 'knows', '?lang' ] ],
-		[ [ '?person', 'usesSoftware', '?software' ] ]
-            ]
+                [ [ [ '?person', 'participatesIn', '?project' ],
+                    [ '?person', 'knows', '?lang' ] ],
+		  [ [ '?person', 'usesSoftware', '?software' ] ] ]
+            ],
+            'Optional' => [ '?project', '?lang', '?software' ]
         ],
 
 	[   'RequestId' => '3',
@@ -271,6 +268,20 @@ $tests = [
 
 	[   'RequestId' => '5',
 	    'Chain' => [
+                [ '?person', 'rdf:type', '?class' ],
+                [ '?person', '?property', '?lang' ],
+            ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?class', 'equal', 'Programmer' ],
+        	    [ '?property', 'equal', 'knows' ],
+        	]
+            ]
+        ],
+
+	[   'RequestId' => '6',
+	    'Chain' => [
                 [ '?person1', 'rdf:type', 'Person' ],
                 [ '?person2', 'rdf:type', 'Person' ],
                 [ '?person1', 'participatesIn', '?project' ],
@@ -288,7 +299,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '6',
+	[   'RequestId' => '7',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'knows', '?lang1' ],
@@ -305,7 +316,7 @@ $tests = [
             ]
         ],
 
-	[   'RequestId' => '7',
+	[   'RequestId' => '8',
 	    'Chain' => [
                 [ '?person', 'rdf:type', 'Person' ],
                 [ '?person', 'knows', '?lang1' ],
@@ -315,7 +326,7 @@ $tests = [
             ],
         ],
 
-	[   'RequestId' => '8',
+	[   'RequestId' => '9',
 	    'Chain' => [
                 [ '?programmer', 'rdfs:subClassOf', 'Person' ],
                 [ '?person', 'rdf:type', '?programmer' ],
@@ -331,7 +342,7 @@ $tests = [
 		[ '?person2', 'yearOfBirth', '?year' ],
 		[ '?person2', 'worksSince', '?works2' ],
             ],
-	    'Optional' => [ ['?lang2', '?name2'] ],
+	    'Optional' => [ [ '?lang2', '?name2' ] ],
             'Filter' => [
         	'and',
         	[ 'and',
@@ -340,27 +351,64 @@ $tests = [
             ]
         ],
 
+	[   'RequestId' => '10',
+	    'Chain' => [
+                [ '?project', 'rdf:type', 'Project' ],
+                [ '?project', 'rdfs:label', 'DEF', 'xsd:string' ],
+                [ [ [ '?person', 'participatesIn', '?project' ],
+                    [ '?person', 'participatesIn', '?otherproj' ],
+                    [ '?person2', 'participatesIn', '?project' ],
+                    [ '?person2', 'participatesIn', '?otherproj' ],
+                    [ '?otherproj', 'rdfs:label', '?otherproj_label' ] ],
+                  [ [ '?person', 'participatesIn', '?project' ],
+                    [ '?person', 'participatesIn', '?otherproj' ],
+                    [ '?otherproj', 'rdfs:label', '?otherproj_label' ] ] ],
+            ],
+	    'Optional' => [ '?person2' ],
+            'Filter' => [
+        	'and',
+        	[ 'and',
+        	    [ '?otherproj', 'notequal', '?project' ]
+        	]
+            ]
+        ],
+
+	[   'RequestId' => '11',
+	    'Chain' => [
+                [ [ [ '?person', 'rdf:type', 'Person' ],
+                    [ '?person', '?predicate', '?value' ] ],
+                  [ [ '?person', 'rdf:type', 'Person' ],
+                    [ '?person', '?predicate', '?object' ] ] ],
+            ],
+        ],
+
+	[   'RequestId' => '12',
+	    'Chain' => [
+                [ '?subject', '?predicate', 'PHP' ],
+            ],
+        ],
+
 ];
 
 $answers = [
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 0
 	      [ [ '?lang' => 'http://localhost/C++', '?person' => 'http://localhost/Jack' ],
 	        [ '?lang' => 'http://localhost/C++', '?person' => 'http://localhost/Jane' ] ],
 	      'numRecords' => 2 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 1
 	      [ [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/2000/01/rdf-schema#label', '?b' => 'C++' ],
 	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://localhost/hasType', '?b' => 'http://localhost/Compilable' ],
 	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?b' => 'http://localhost/Language' ],
 	        [ '?lang' => 'http://localhost/C++', '?a' => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', '?b' => 'http://www.w3.org/2002/07/owl#NamedIndividual' ] ],
 	      'numRecords' => 14 ],
 
-	    [ 'hasResult' =>
-	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF', '?visit' => '2021-04-12T15:24:45', '?since' => '2015-05-23', '?year'=> '1979' ],
-	        [ '?person' => 'http://localhost/Jill', '?name' => 'Jill Doe', '?project' => 'http://localhost/DEF', '?visit' => '2021-04-12T15:28:12', '?since' => '2015-05-18', '?year' => '1990' ] ],
-	      'numRecords' => 0 ],
+	    [ 'hasResult' => // 2
+	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF', '?visit' => '2021-04-12T15:24:45', '?since' => '2015-05-23', '?year'=> '1979', '?software' => '' ],
+	        [ '?person' => 'http://localhost/Jill', '?name' => 'Jill Doe', '?lang' => '', '?project' => '', '?visit' => '2021-04-12T15:28:12', '?since' => '2015-05-18', '?year' => '1990', '?software' => 'http://localhost/Photoshop' ] ],
+	      'numRecords' => 14 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 3
 	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/ABC' ],
 	        [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/C++', '?project' => 'http://localhost/DEF' ],
 	        [ '?person' => 'http://localhost/Jack', '?name' => 'Джек Доу', '?lang' => 'http://localhost/JavaScript', '?project' => 'http://localhost/DEF' ],
@@ -368,40 +416,59 @@ $answers = [
 	        [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?lang' => 'http://localhost/PHP', '?project' => 'http://localhost/DEF' ] ],
 	     'numRecords' => 13 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 4
 	      [ [ '?lang' => 'http://localhost/C++', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'C++' ], 
 	        [ '?lang' => 'http://localhost/PHP', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'PHP' ], 
 	        [ '?lang' => 'http://localhost/JavaScript', '?property' => 'http://www.w3.org/2000/01/rdf-schema#label', '?name' => 'JavaScript' ] ],
 	      'numRecords' => 3 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 5
+	      [ [ '?person' => 'http://localhost/Jack', '?lang' => 'http://localhost/C++', '?class' => 'http://localhost/Programmer', '?property' => 'http://localhost/knows' ] ],
+	      'numRecords' => 4 ],
+
+	    [ 'hasResult' => // 6
 	      [ [ '?person1' => 'http://localhost/Jack', '?project' => 'http://localhost/ABC', '?lang1' => 'http://localhost/C++', '?type1' => 'http://localhost/Compilable', '?person2' => 'http://localhost/Jane', '?lang2' => 'http://localhost/C++', '?type2' => 'http://localhost/Compilable' ],
 	        [ '?person1' => 'http://localhost/Jane', '?lang1' => 'http://localhost/C++', '?type1' => 'http://localhost/Compilable', '?person2' => 'http://localhost/Jack', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/PHP', '?type2' => 'http://localhost/Interpretable' ] ],
 	      'numRecords' => 12 ],
 
-	    [ 'hasResult' => 
+	    [ 'hasResult' => // 7
 	      [ [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/C++', '?name1' => 'C++', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ],
 	        [ '?person' => 'http://localhost/Jack', '?lang1' => 'http://localhost/PHP', '?name1' => 'PHP', '?project' => 'http://localhost/DEF', '?lang2' => 'http://localhost/PHP', '?name2' => 'PHP' ],
 	        [ '?person' => 'http://localhost/Jane', '?lang1' => 'http://localhost/C++', '?name1' => 'C++', '?project' => 'http://localhost/ABC', '?lang2' => 'http://localhost/C++', '?name2' => 'C++' ] ],
 	      'numRecords' => 6 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 8
 	      [ [ '?project' => 'http://localhost/ABC', '?person' => 'http://localhost/Jack', '?name1' => 'C++', '?lang1' => 'http://localhost/C++', '?lang2' => 'http://localhost/C++' ],
 	        [ '?project' => 'http://localhost/DEF', '?person' => 'http://localhost/Jack', '?name1' => 'C++', '?lang1' => 'http://localhost/C++', '?lang2' => 'http://localhost/PHP' ] ],
 	      'numRecords' => 16 ],
 
-	    [ 'hasResult' =>
+	    [ 'hasResult' => // 9
 	      [ [ 
 	      '?programmer' => 'http://localhost/Programmer', '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe', '?year' => '1979', '?lang' => 'http://localhost/PHP', '?subclass' => 'http://localhost/Programmer', '?person2' => 'http://localhost/Jax', '?namelang' => 'PHP', '?works' => '2015-05-23','?works2' => '2019-01-18', '?name2' => '', '?lang2' => '' ] ],
-	      'numRecords' => 12 ]
+	      'numRecords' => 72 ],
+
+	    [ 'hasResult' => // 10
+	      [ [ 
+	      '?project' => 'http://localhost/DEF', '?person' => 'http://localhost/Jane', '?person2' => 'http://localhost/Jack', '?otherproj' => 'http://localhost/ABC', '?otherproj_label' => 'ABC' ] ],
+	      'numRecords' => 7 ],
+
+	    [ 'hasResult' => // 11
+	      [ [ 
+	      '?person' => 'http://localhost/Jack', '?predicate' => 'http://localhost/knows', '?value' => 'http://localhost/C++', '?object' => 'http://localhost/PHP' ] ],
+	      'numRecords' => 621 ],
+
+	    [ 'hasResult' => // 12
+	      [ [ 
+	      '?subject' => 'http://localhost/Jack', '?predicate' => 'http://localhost/knows' ] ],
+	      'numRecords' => 621 ],
 
 	];
 
 
-echo("\n5. Running complex tests\n");
+echo("\n3. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if( $ind == 2 ) continue;
-	echo("\n" . ($ind + 1) . ". ");
+if( $ind != 12 ) continue;
+	echo(($ind + 1) . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );
 	$et = microtime(true);
