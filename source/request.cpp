@@ -289,7 +289,6 @@ public:
                 }
             }
         }
-
         // Write the last block of the array
         *message = this->save_parsed_item(&subject, &predicate, &object, &datatype, lang, operation, in_block, current_level, &pos, &status);
         if (status == -1)

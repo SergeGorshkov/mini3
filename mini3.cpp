@@ -2,6 +2,7 @@
 #define JSMN_PARENT_LINKS 1
 #define MULTITHREAD
 #define LISTEN_QUEUES
+//#define PRINT_DIAGNOSTICS
 #define WEBSERVER
 #define VERBOSE
 #include <stdio.h>

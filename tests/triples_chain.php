@@ -158,6 +158,8 @@ $req = [    'RequestId' => '2',
 		[ 'writtenOn', 'rdfs:range', 'Language' ],
 		[ 'writtenOn', 'rdfs:label', 'is written on', 'xsd:string' ],
 
+		[ 'Photoshop', 'rdf:type', 'Software' ],
+		[ 'Photoshop', 'rdf:type', 'owl:NamedIndividual' ],
 		[ 'ABC', 'rdf:type', 'Project' ],
 		[ 'ABC', 'writtenOn', 'C++' ],
 		[ 'ABC', 'rdf:type', 'owl:NamedIndividual' ],
@@ -418,8 +420,8 @@ $tests = [
             'Filter' => [
         	'and',
         	[ 'or',
-        	    [ '?name', 'iequal', 'jane' ],
-        	    [ '?name', 'iequal', 'jack' ]
+        	    [ '?name', 'iequal', 'jane doe' ],
+        	    [ '?name', 'iequal', 'jack doe' ]
         	]
             ]
         ],
@@ -445,7 +447,7 @@ $tests = [
         	]
             ],
 	    'Limit' => 1,
-	    'Offset' => 2
+	    'Offset' => 1
         ],
 
 	[   'RequestId' => '22',
@@ -483,7 +485,7 @@ $tests = [
 		  [ [ '?software', 'rdf:type', 'Software' ],
                     [ '?person', '?predicate', '?software' ] ] ],
             ],
-	    'Optional' => [ 'Software', 'Project' ]
+	    'Optional' => [ '?software', '?project' ]
         ],
 
 	[   'RequestId' => '25',
@@ -570,7 +572,7 @@ $answers = [
 	    [ 'hasResult' => // 12
 	      [ [ 
 	      '?subject' => 'http://localhost/Jack', '?predicate' => 'http://localhost/knows' ] ],
-	      'numRecords' => 4 ],
+	      'numRecords' => 2 ],
 
 	    [ 'hasResult' => // 13
 	      [ [ '?person' => 'http://localhost/Jack', '?lang' => 'http://localhost/JavaScript' ] ],
@@ -596,45 +598,50 @@ $answers = [
 	      'numRecords' => 2 ],
 
 	    [ 'hasResult' => // 18
-	      [ [ '?person' => 'http://localhost/Jack' ] ],
+	      [ [ '?person' => 'http://localhost/Jack', '?name' => 'Jack Doe' ] ],
 	      'numRecords' => 1 ],
 
 	    [ 'hasResult' => // 19
-	      [ [ '?person' => 'http://localhost/Jane' ] ],
+	      [ [ '?person' => 'http://localhost/Jane', '?name' => 'Jane Doe' ] ],
 	      'numRecords' => 2 ],
 
 	    [ 'hasResult' => // 20
 	      [ [ '?project' => 'http://localhost/ABC', '?language' => 'http://localhost/C++', '?person' => 'http://localhost/Jane' ] ],
-	      'numRecords' => 4 ],
+	      'numRecords' => 2 ],
 
 	    [ 'hasResult' => // 21
-	      [ [ '?person' => 'http://localhost/Jax', '?name' => 'Jax' ] ],
+	      [ [ '?person' => 'http://localhost/Jane', '?name' => 'Jane Doe' ] ],
 	      'numRecords' => 1 ],
 
 	    [ 'hasResult' => // 22
-	      [ [ '?person' => 'http://localhost/Jill', '?name' => 'Jill' ] ],
+	      [ [ '?person' => 'http://localhost/Jill', '?name' => 'Jill Doe' ] ],
 	      'numRecords' => 1 ],
 
 	    [ 'hasResult' => // 23
 	      [ [ '?person' => 'http://localhost/Jill' ] ],
-	      'numRecords' => 2 ],
+	      'numRecords' => 1 ],
 
 	    [ 'hasResult' => // 24
-	      [ [ '?person' => 'http://localhost/Jill', '?predicate' => 'usesSoftware', '?software' => 'http://localhost/Photoshop' ],
-		[ '?person' => 'http://localhost/Jack', '?predicate' => 'participatesIn', '?project' => 'http://localhost/ABC' ] ],
-	      'numRecords' => 4 ],
+	      [ [ '?person' => 'http://localhost/Jill', '?predicate' => 'http://localhost/usesSoftware', '?software' => 'http://localhost/Photoshop', '?project' => '' ],
+		[ '?person' => 'http://localhost/Jack', '?predicate' => 'http://localhost/participatesIn', '?project' => 'http://localhost/ABC', '?software' => '' ] ],
+	      'numRecords' => 15 ],
 
 	    [ 'hasResult' => // 25
-	      [ [ '?a' => 'http://localhost/Jack', '?b' => 'rdfs:label', '?software' => 'Jack' ] ],
-	      'numRecords' => 5 ],
+	      [ [ '?a' => 'http://localhost/Jack', '?b' => 'http://www.w3.org/2000/01/rdf-schema#label', '?c' => 'Jack Doe' ] ],
+	      'numRecords' => 6 ],
 
 	];
 
 echo("\n3. Running complex tests\n");
 foreach( $tests as $ind => $test ) {
-if( $ind != 18 ) continue;
-//print_r($test);
-	echo(($ind + 1) . ". ");
+/*
+if( $ind != 12 ) continue;
+echo("test:\n");
+print_r($test);
+echo("result:\n");
+print_r($answers[ $ind ][ 'hasResult' ]);
+*/
+	echo($ind . ". ");
 	$st = microtime(true);
 	$res = request('GET', 'chain', $test );
 	$et = microtime(true);
@@ -679,8 +686,9 @@ if( $ind != 18 ) continue;
 	}
 
 	if( $error ) {
+		echo(" ERROR");
 		// Print table
-		foreach($res->Vars as $rr) {
+/*		foreach($res->Vars as $rr) {
 		    echo($rr."\t");
 		}
 		echo("\n");
@@ -689,7 +697,7 @@ if( $ind != 18 ) continue;
 			echo($r[0]."\t");
 		    }
 		    echo("\n");
-		}
+		} */
 	}
 	else
 		echo(" OK");

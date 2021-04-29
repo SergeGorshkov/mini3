@@ -129,7 +129,7 @@
             "style": "form",
             "explode": true,
             "schema": {
-              "$ref": "#/components/schemas/ArrayOfPatterns"
+              "$ref": "#/components/schemas/ArrayOfPatterns",
             }
           }
         ],
@@ -284,12 +284,15 @@
           {
             "name": "request",
             "in": "query",
-            "description": "Request body in the form of array of patterns (see ArrayOfChains schema).",
+            "description": "Request body in the form of array of chain patterns (see ArrayOfChains / ArrayOfUnionChains schemas).",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
-              "$ref": "#/components/schemas/ArrayOfChains"
+              "anyOf": {
+                "$ref": "#/components/schemas/ArrayOfChains",
+                "$ref": "#/components/schemas/ArrayOfUnionChains"
+              }
             }
           }
         ],
@@ -325,12 +328,15 @@
           {
             "name": "request",
             "in": "query",
-            "description": "Request body in the form of array of patterns (see ArrayOfChains schema).",
+            "description": "Request body in the form of array of patterns (see ArrayOfChains / ArrayOfUnionChains schemas).",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
-              "$ref": "#/components/schemas/ArrayOfChains"
+              "anyOf": {
+                "$ref": "#/components/schemas/ArrayOfChains",
+                "$ref": "#/components/schemas/ArrayOfUnionChains"
+              }
             }
           }
         ],
@@ -657,6 +663,125 @@
 	    ],
 	    [
 	      "?name", "desc"
+	    ]
+	  ],
+	  "Limit": "10"
+        }
+      },
+      "ArrayOfUnionChains": {
+        "type": "object",
+        "required": [
+          "Chain"
+        ],
+        "properties": {
+          "RequestId": {
+            "type": "string",
+            "description": "A request id used to reference request in the answer (useful when querying API using queues)"
+          },
+          "Chain": {
+            "type": "array",
+            "description": "Array of arrays of triples chain elements. Each top-level array represents an "UNION" SPARQL request clause. The first element of each nested pattern is a Subject, the second one is Predicate, the third is an Object. Each element may be a full URI, short (prefixed) URI, or a ?variable. The chain construction has generally the same sense as the SPARQL SELECT pattern with UNION clauses.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": "3",
+                "maxItems": "3",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "Filter": {
+            "type": "array",
+            "description": "Array of filters. The first element is the logic operation (and, or), each subsequent element is the array representing a nested group of filters or a filter condition.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "array",
+		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
+                "minItems": "2",
+                "maxItems": "3",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+	  "Optional": {
+	    "type": "array",
+	    "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values). Do not forget to mention variables as optional if they are present in the UNION clauses, but may not be present in the query result.",
+	    "items": {
+	      "type": "string"
+	    }
+	  },
+          "Order": {
+            "type": "array",
+            "description": "Array of result sorting sequences (optional). The first item of each element is a ?variable, the second item is the sort order: asc or desc.",
+            "items": {
+              "type": "array",
+              "minItems": "2",
+              "maxItems": "2",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "Limit": {
+            "type": "integer",
+            "description": "The number of records to be returned"
+          },
+          "Offset": {
+            "type": "integer",
+            "description": "The number of the first record to be returned"
+          }
+        },
+        "example": {
+          "RequestId": "12345",
+          "Chain": [
+            [
+              "?person",
+              "rdfs:label",
+              "?personname"
+            ],
+            [
+              [
+                "?person",
+                "rdf:type",
+                "http://localhost/Programmer"
+              ],
+              [
+                "?person",
+                "http://localhost/knows",
+                "?language"
+              ]
+            ],
+            [
+              [
+                "?person",
+                "rdf:type",
+                "http://localost/Designer"
+              ],
+              [
+                "?person",
+                "http://localhost/uses",
+                "?software"
+              ]
+            ]
+          ],
+	  "Optional": [ "?language", "?software" ],
+          "Filter": [
+	    "and",
+            [
+              "?personname",
+              "icontains",
+              "doe"
+            ]
+          ],
+	  "Order": [
+	    [
+	      "?personname", "asc"
 	    ]
 	  ],
 	  "Limit": "10"
