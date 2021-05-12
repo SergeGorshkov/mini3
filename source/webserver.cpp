@@ -16,6 +16,7 @@ class webserver {
 		if(!buffer) utils::out_of_memory(fd);
 		buffer[0] = 0;
 		int pos = 0, content_length = 0, content_start = 0;
+utils::logger(LOG, "start read", "", getpid());
 		do
 		{
 			if (pos != 0 && content_length != 0 && (pos >= content_start + content_length))
@@ -52,6 +53,7 @@ class webserver {
 				}
 			}
 		} while (ret > 0);
+utils::logger(LOG, "finish read", "", getpid());
 
 		if (pos > 0 && pos < ( content_length > 0 ? BUFSIZE + content_length : BUFSIZE ))
 			buffer[pos] = 0;
@@ -100,12 +102,17 @@ class webserver {
 			free(buffer);
 			utils::logger(FORBIDDEN, "No request= parameter is given", "", fd);
 		}
+		#ifdef LOG_REQUESTS
 		utils::logger(LOG, "Request", rp, hit);
+		#endif
+utils::logger(LOG, "call process_request", "", getpid());
 		char *response = utils::process_request(rp, operation, endpoint, modifier, pip);
+utils::logger(LOG, "return from process_request", "", getpid());
 		len = strlen(response);
 		(void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: mini-3/%s\nContent-Length: %ld\nConnection: close\nContent-Type: application/json\n\n", VERSION, len); // Header + a blank line
-																																								//	utils::logger(LOG,"Header",buffer,hit);
+		#ifdef LOG_REQUESTS
 		utils::logger(LOG, "Answer", response, hit);
+		#endif
 		(void)write(fd, buffer, strlen(buffer));
 		(void)write(fd, response, len);
 		free(response);
@@ -153,6 +160,7 @@ class webserver {
 			length = sizeof(cli_addr);
 			if ((socketfd = accept(listenfd, (struct sockaddr *)&cli_addr, &length)) < 0)
 				utils::logger(ERROR, "system call", "accept", 0);
+utils::logger(LOG, "accept", "", getpid());
 			if ((pid = fork()) < 0)
 				utils::logger(ERROR, "system call", "fork", 0);
 			else

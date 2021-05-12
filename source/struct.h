@@ -18,7 +18,7 @@
 #define LOG 44
 #define FORBIDDEN 403
 #define NOTFOUND 404
-#define VERSION "0.90"
+#define VERSION "0.80"
 #define STATUS_DELETED 1
 
 #define N_MAX_PREFIX 64
@@ -27,8 +27,8 @@
 #define N_MAX_FILTER_GROUPS 32
 #define N_MAX_ORDERS 32
 #define SEGMENT 32768    // The amount of triples after which the storage is reallocated
-#define CHUNK_SIZE 1024  // The segment size after which the index is chunked further
-#define MAX_CHUNKS 16384 // The maximal possible amount of chunks
+#define INITIAL_CHUNK_SIZE 1024  // The segment size after which the index is chunked further
+#define MAX_CHUNKS 32768 // The maximal possible amount of chunks
 #define N_GLOBAL_VARS 7
 
 #define COMMIT_TRIPLE 1
@@ -184,7 +184,7 @@ unsigned long *global_block_ul = NULL;
 prefix *prefixes = NULL;
 triple *triples = NULL;
 mini_index *full_index = NULL, *s_index = NULL, *p_index = NULL, *o_index = NULL;
-unsigned long *active_requests = 0, *n_chunks = 0, *n_triples = 0, *n_prefixes = 0, *string_allocated = 0, *string_length = 0, *allocated = 0;
+unsigned long *single_chunk_size = 0, *n_chunks = 0, *n_triples = 0, *n_prefixes = 0, *string_allocated = 0, *string_length = 0, *allocated = 0;
 unsigned long *chunks_size = 0, *s_chunks_size = 0, *p_chunks_size = 0, *o_chunks_size = 0;
 bool chunks_rebuilt = false, triples_reallocated = false;
 int chunk_bits = 0;

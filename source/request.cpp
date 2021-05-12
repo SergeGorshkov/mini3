@@ -33,6 +33,7 @@ public:
         bool in_method = false, in_id = false, in_limit = false, in_offset = false;
 
         memset(nested_array_items, 0, 32*sizeof(int));
+        memset(this->var, 0, sizeof(chain_variable)*N_MAX_VARIABLES);
         memset(this->current_filter_group, -1, N_MAX_FILTER_GROUPS*sizeof(int));
         memset(this->optional_group, -1, N_MAX_VARIABLES*sizeof(int));
         utils::init_globals(O_RDONLY);
@@ -336,7 +337,7 @@ public:
         }
         else if (endpoint == EP_CHAIN && this->_n_triples && this->n_var && operation == OP_GET)
         {
-            utils::logger(LOG, "GET triples request", this->request_id, 0);
+            utils::logger(LOG, "GET chain request", this->request_id, 0);
             *message = this->return_triples_chain(this->request_id);
             return true;
         }
@@ -396,13 +397,13 @@ public:
         if (!chunks_rebuilt)
         {
             if (full_index)
-                munmap(full_index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+                munmap(full_index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
             if (s_index)
-                munmap(s_index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+                munmap(s_index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
             if (p_index)
-                munmap(p_index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+                munmap(p_index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
             if (o_index)
-                munmap(o_index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+                munmap(o_index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         }
         if (stringtable)
             munmap(stringtable, *string_allocated);

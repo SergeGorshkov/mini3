@@ -116,79 +116,85 @@ class transaction {
     {
         unsigned long newsize[MAX_CHUNKS];
         memset(newsize, 0, sizeof(unsigned long) * MAX_CHUNKS);
-        mini_index *tmp = (mini_index *)malloc((*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+        mini_index *tmp = (mini_index *)malloc((*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         if(!tmp) utils::out_of_memory();
-        memcpy(tmp, index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
-        munmap(index, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
-        mini_index *newindex = (mini_index *)utils::mmap_file(O_RDWR, file, (*n_chunks) * 2 * CHUNK_SIZE * sizeof(mini_index));
-        /*
+        memcpy(tmp, index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
+        munmap(index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
+        mini_index *newindex = (mini_index *)utils::mmap_file(O_RDWR, file, (*n_chunks) * 2 * (*single_chunk_size) * sizeof(mini_index));
+/*
 char logstr[1024];
-utils::logger(LOG, "Dumping index before re-chunk ", file, (*n_chunks)*CHUNK_SIZE*sizeof(mini_index));
+utils::logger(LOG, "Dumping index before re-chunk ", file, (*n_chunks)*(*single_chunk_size)*sizeof(mini_index));
 for(unsigned long c=0; c<*n_chunks; c++) {
     if(size[c] == 0) continue;
     sprintf(logstr, "Chunk %lu, %lu items", c, size[c]);
     utils::logger(LOG, logstr, "", 0);
     //continue;
     for(int i=0; i<size[c]; i++) {
-        sprintf(logstr, "%lx\t%lu", tmp[c*CHUNK_SIZE + i].mini_hash, tmp[c*CHUNK_SIZE + i].index);
+        sprintf(logstr, "%016lx\t%lu", tmp[c*(*single_chunk_size) + i].mini_hash, tmp[c*(*single_chunk_size) + i].index);
         utils::logger(LOG, logstr, "", 0);
     }
 }
-utils::logger(LOG, "\n", "", 0); */
+utils::logger(LOG, "\n", "", 0);
+*/
         for (int i = 0; i < (*n_chunks); i++)
         {
             bool moved = false;
+            // Cycle through index items to find the boundary which split the chunk i into two new chunks
             for (int j = 0; j < size[i]; j++)
             {
-                unsigned long target = tmp[i * CHUNK_SIZE + j].mini_hash >> (64 - chunk_bits - 1);
+                unsigned long target = tmp[i * (*single_chunk_size) + j].mini_hash >> (64 - chunk_bits - 1);
                 // The records behind this point are going to the second part of the new chunk
+                // i * 2 + 1 is the index of the second new chunk for the chunk i
                 if (target == i * 2 + 1)
                 {
+                    // If there are records in the first new chunk
                     if (j > 0)
                     {
-                        memcpy((void *)((unsigned long)newindex + (i * 2 * CHUNK_SIZE) * sizeof(mini_index)), (void *)((unsigned long)tmp + i * CHUNK_SIZE * sizeof(mini_index)), j * sizeof(mini_index));
+                        memcpy((void *)((unsigned long)newindex + (i * 2 * (*single_chunk_size)) * sizeof(mini_index)), (void *)((unsigned long)tmp + i * (*single_chunk_size) * sizeof(mini_index)), j * sizeof(mini_index));
                         newsize[i * 2] = j;
                     }
-                    if (j < size[i] - 1)
-                    {
-                        memcpy((void *)((unsigned long)newindex + ((i * 2 + 1) * CHUNK_SIZE) * sizeof(mini_index)), (void *)((unsigned long)tmp + (i * CHUNK_SIZE + j) * sizeof(mini_index)), (size[i] - j) * sizeof(mini_index));
-                        newsize[i * 2 + 1] = size[i] - j;
-                    }
+                    // There always are records in the second new chunk
+                    memcpy((void *)((unsigned long)newindex + ((i * 2 + 1) * (*single_chunk_size)) * sizeof(mini_index)), (void *)((unsigned long)tmp + (i * (*single_chunk_size) + j) * sizeof(mini_index)), (size[i] - j) * sizeof(mini_index));
+                    newsize[i * 2 + 1] = size[i] - j;
                     moved = true;
                     break;
                 }
             }
-            // If there is no boundary in this chunk
+            // If there is no boundary in this chunk, all its content goes to one chunk
             if (!moved && size[i] > 0)
             {
-                memcpy((void *)((unsigned long)newindex + (i * 2 * CHUNK_SIZE) * sizeof(mini_index)), (void *)((unsigned long)tmp + i * CHUNK_SIZE * sizeof(mini_index)), size[i] * sizeof(mini_index));
-                newsize[i * 2] = size[i];
+                unsigned long target = tmp[i * (*single_chunk_size)].mini_hash >> (64 - chunk_bits - 1);
+                memcpy((void *)((unsigned long)newindex + (target * (*single_chunk_size)) * sizeof(mini_index)), (void *)((unsigned long)tmp + i * (*single_chunk_size) * sizeof(mini_index)), size[i] * sizeof(mini_index));
+                newsize[target] = size[i];
             }
         }
         free(tmp);
         memcpy(size, newsize, sizeof(unsigned long) * MAX_CHUNKS);
-        /* utils::logger(LOG, "Dumping index after re-chunk ", file, (*n_chunks)*2*CHUNK_SIZE*sizeof(mini_index));
+/*
+utils::logger(LOG, "Dumping index after re-chunk ", file, (*n_chunks));
 for(unsigned long c=0; c<(*n_chunks)*2; c++) {
     if(size[c] == 0) continue;
     sprintf(logstr, "Chunk %lu, %lu items", c, size[c]);
     utils::logger(LOG, logstr, "", 0);
     //continue;
     for(int i=0; i<size[c]; i++) {
-        sprintf(logstr, "%lx\t%lu", newindex[c*CHUNK_SIZE + i].mini_hash, newindex[c*CHUNK_SIZE + i].index);
+        sprintf(logstr, "%016lx\t%lu", newindex[c*(*single_chunk_size) + i].mini_hash, newindex[c*(*single_chunk_size) + i].index);
         utils::logger(LOG, logstr, "", 0);
     }
 }
-utils::logger(LOG, "\n", "", 0); */
+utils::logger(LOG, "\n", "", 0);
+*/
         return newindex;
     }
 
+    // Returns true if chunk has reached maximal size and it content is not uniform, so we can try to split it
     static bool check_chunk_size(mini_index *idx, unsigned long size, unsigned long n)
     {
     //utils::logger(LOG, "Check chunk size", "", size);
-        if (size != CHUNK_SIZE)
+        if (size != (*single_chunk_size))
             return false;
-        unsigned long offset = n * CHUNK_SIZE;
-        for (unsigned long i = 1; i < CHUNK_SIZE; i++)
+        unsigned long offset = n * (*single_chunk_size);
+        for (unsigned long i = 1; i < (*single_chunk_size); i++)
         {
             if (idx[offset + i].mini_hash != idx[offset].mini_hash)
                 return true;
@@ -220,54 +226,64 @@ utils::logger(LOG, "\n", "", 0); */
         }
     }
 
+    static mini_index *increase_chunk_size(char *file, mini_index *index, unsigned long *size)
+    {
+        mini_index *tmp = (mini_index *)malloc((*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
+        if(!tmp) utils::out_of_memory();
+        memcpy(tmp, index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
+        munmap(index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
+        mini_index *newindex = (mini_index *)utils::mmap_file(O_RDWR, file, (*n_chunks) * (*single_chunk_size) * 2 * sizeof(mini_index));
+        for (int i = 0; i < (*n_chunks); i++) {
+            memset((void *)((unsigned long)newindex + (i * (*single_chunk_size) * 2) * sizeof(mini_index)), 0, (*single_chunk_size) * 2 * sizeof(mini_index));
+            memcpy((void *)((unsigned long)newindex + (i * (*single_chunk_size) * 2) * sizeof(mini_index)), (void *)((unsigned long)tmp + (i * (*single_chunk_size)) * sizeof(mini_index)), (*single_chunk_size) * sizeof(mini_index));
+        }
+        free(tmp);
+        return newindex;
+    }
+
     static unsigned long insert_into_index(char *s, mini_index *index, unsigned long *f_chunks_size)
     {
         unsigned long target_chunk = 0, pos = 0;
         unsigned long mini_hash = triples_index::get_mini_hash_char(s);
         triples_index::_find_using_index(index, f_chunks_size, mini_hash, &pos, &target_chunk);
-    /* char strl[1024];
-sprintf(strl, "%lx", mini_hash);
+/*
+char strl[1024];
+sprintf(strl, "%016lx", mini_hash);
 utils::logger(LOG, "insert_into_index", s, pos);
-utils::logger(LOG, strl, "chunk", target_chunk); */
-        // If there are many similar identifiers in S, P or O index, a chunk may overflow. In this case we use a neighboring chunk
-        if (f_chunks_size[target_chunk] == CHUNK_SIZE)
-        {
-            bool found = false;
-            for (unsigned long i = target_chunk + 1; i < (*n_chunks); i++)
-            {
-                if (f_chunks_size[i] < CHUNK_SIZE)
-                {
-                    target_chunk = i;
-                    pos = 0;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                for (unsigned long i = target_chunk - 1; i >= 0; i--)
-                {
-                    if (f_chunks_size[i] < CHUNK_SIZE)
-                    {
-                        target_chunk = i;
-                        pos = f_chunks_size[i];
-                        found = true;
-                        break;
-                    }
-                }
-            if (!found)
-                utils::logger(ERROR, "Cannot update index, chunks are overflown", s, 0);
+utils::logger(LOG, strl, "chunk", target_chunk);
+*/
+        // If there are many similar identifiers in S, P or O index, a chunk may overflow. In this case we increase the chunk size.
+        if (f_chunks_size[target_chunk] == (*single_chunk_size)) {
+            bool set = false;
+            set = (index == full_index) ? true : false;
+            full_index = increase_chunk_size(INDEX_FILE, full_index, chunks_size);
+            if(set) index = full_index;
+            set = (index == s_index) ? true : false;
+            s_index = increase_chunk_size(S_INDEX_FILE, s_index, s_chunks_size);
+            if(set) index = s_index;
+            set = (index == p_index) ? true : false;
+            p_index = increase_chunk_size(P_INDEX_FILE, p_index, p_chunks_size);
+            if(set) index = p_index;
+            set = (index == o_index) ? true : false;
+            o_index = increase_chunk_size(O_INDEX_FILE, o_index, o_chunks_size);
+            if(set) index = o_index;
+            *single_chunk_size *= 2;
+            utils::logger(LOG, "Increased chunk size to", "", *single_chunk_size);
+            target_chunk = pos = 0;
+            triples_index::_find_using_index(index, f_chunks_size, mini_hash, &pos, &target_chunk);
         }
-        if (target_chunk * CHUNK_SIZE + f_chunks_size[target_chunk] - pos > 0)
+        if (target_chunk * (*single_chunk_size) + f_chunks_size[target_chunk] - pos > 0)
             memmove((void *)((unsigned long)index + (pos + 1) * sizeof(mini_index)),
                     (void *)((unsigned long)index + pos * sizeof(mini_index)),
-                    sizeof(mini_index) * (f_chunks_size[target_chunk] + target_chunk * CHUNK_SIZE - pos));
+                    sizeof(mini_index) * (f_chunks_size[target_chunk] + target_chunk * (*single_chunk_size) - pos));
         f_chunks_size[target_chunk]++;
         index[pos].index = *n_triples;
         index[pos].mini_hash = mini_hash;
-        /*
+/*
 char str[1024];
-sprintf(str, "Insert: pos = %lu, chunk = %i, %i triples in chunk\n", pos, target_chunk, f_chunks_size[target_chunk]);
-utils::logger(LOG, str, "", 0); */
+sprintf(str, "Insert: pos = %lu, chunk = %i, %i triples in chunk, set index[pos].index = %lu, p_index[pos].index = %lu, %x, %x\n", pos, target_chunk, f_chunks_size[target_chunk], index[pos].index, p_index[pos].index, index, p_index);
+utils::logger(LOG, str, "", 0);
+*/
         return target_chunk;
     }
 
@@ -275,16 +291,16 @@ utils::logger(LOG, str, "", 0); */
     {
         unsigned long pos = 0;
         char message[10240];
-        /*
+/*
 sprintf(message, "%lu", t->mini_hash);
 utils::logger(LOG, "(parent) Global commit", message, *n_triples);
-    */
+*/
         unsigned long target_chunk = 0;
         long ind = triples_index::find_using_index(full_index, chunks_size, t->hash, t->mini_hash, &pos, &target_chunk, t->d, t->l);
-    /*
+/*
 sprintf(message,"(parent) Triple %s with hash %lx has ind %i, pos %lu in chunk %lu", t->o, t->mini_hash, ind, pos, target_chunk);
 utils::logger(LOG, message, "", 0);
-    */
+*/
         // If this triple already exists - skip it
         if (ind > -1)
         {
@@ -324,12 +340,12 @@ utils::logger(LOG, message, "", 0);
             triples[*n_triples].d_pos = 0;
         }
 
-    //sprintf(message,"insert into main index: chunk = %lu, offset = %lu, pos = %lu\n", target_chunk, target_chunk * CHUNK_SIZE + chunks_size[target_chunk], pos);
+    //sprintf(message,"insert into main index: chunk = %lu, offset = %lu, pos = %lu\n", target_chunk, target_chunk * (*single_chunk_size) + chunks_size[target_chunk], pos);
     //utils::logger(LOG, message, "", 0);
-        if (target_chunk * CHUNK_SIZE + chunks_size[target_chunk] - pos > 0)
+        if (target_chunk * (*single_chunk_size) + chunks_size[target_chunk] - pos > 0)
             memmove((void *)((unsigned long)full_index + (pos + 1) * sizeof(mini_index)),
                     (void *)((unsigned long)full_index + pos * sizeof(mini_index)),
-                    (target_chunk * CHUNK_SIZE + chunks_size[target_chunk] - pos) * sizeof(mini_index));
+                    (target_chunk * (*single_chunk_size) + chunks_size[target_chunk] - pos) * sizeof(mini_index));
         chunks_size[target_chunk]++;
         full_index[pos].index = *n_triples;
         full_index[pos].mini_hash = t->mini_hash;
@@ -340,7 +356,7 @@ utils::logger(LOG, message, "", 0);
         // O-index
         unsigned long o_target_chunk = insert_into_index(t->o, o_index, o_chunks_size);
         (*n_triples)++;
-        if (chunks_size[target_chunk] == CHUNK_SIZE || s_chunks_size[s_target_chunk] == CHUNK_SIZE || p_chunks_size[p_target_chunk] == CHUNK_SIZE || o_chunks_size[o_target_chunk] == CHUNK_SIZE)
+        if (chunks_size[target_chunk] == (*single_chunk_size) || s_chunks_size[s_target_chunk] == (*single_chunk_size) || p_chunks_size[p_target_chunk] == (*single_chunk_size) || o_chunks_size[o_target_chunk] == (*single_chunk_size))
             rebuild_chunks();
         sem_post(sem);
         save_globals();
@@ -353,7 +369,7 @@ utils::logger(LOG, message, "", 0);
         sem_wait(sem);
         *(unsigned long *)global_block_ul = *n_triples;
         *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long)) = *n_prefixes;
-        *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2) = 0;
+        *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2) = *single_chunk_size;
         *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 3) = *allocated;
         *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 4) = *string_allocated;
         *(unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 5) = *string_length;

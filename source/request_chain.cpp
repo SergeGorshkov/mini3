@@ -676,16 +676,16 @@ for(int x=0; x<n; x++) {
         printf("\n");
     }
     if(!this->var[i].n_cand) continue;
-    printf("\tCandidates:\n");
-    for(int j=0; j<this->var[i].n_cand; j++) {
+    printf("\tCandidates: %i\n", this->var[i].n_cand);
+/*    for(int j=0; j<this->var[i].n_cand; j++) {
         if(!this->var[i].cand[j]) continue;
         printf("\t\t%s\n", this->var[i].cand[j]);
-    }
+    }*/
     printf("\tSolutions:\n");
     for(int k=0; k<N_MAX_VARIABLES; k++) {
         if(this->var[i].n_sol[k] == 0) continue;
         printf("\t\t%s: %i\n", this->var[k].obj, this->var[i].n_sol[k]);
-        for(int j=0; j<this->var[i].n_sol[k]; j++) {
+/*        for(int j=0; j<this->var[i].n_sol[k]; j++) {
             if(this->var[i].solution[k][j] >= 0 && this->var[k].n_cand > this->var[i].solution[k][j]) {
                 if(this->var[k].cand[ this->var[i].solution[k][j] ]) {
                     printf("\t\t\t%s\t", this->var[i].cand[ this->var[i].solution_cand[k][j] ]);
@@ -699,7 +699,7 @@ for(int x=0; x<n; x++) {
                     printf(" (%s)", this->var[ this->var[i].dependent_of[0] ].cand[ this->var[i].bearer[k][j] ]);
             }
             printf("\n");
-        }
+        } */
     }
 }
 
@@ -858,8 +858,8 @@ for (int x = 0; x < n; x++)
         }
         printf("\n");
     }
-}
-*/
+}*/
+
         // Push the combination of the independent variables into the global array of combinations, and transform candidates indexes into URIs or literal values
         for (int i = 0; i < n; i++) {
             if (this->var[i].dep > 0) continue;
@@ -868,7 +868,6 @@ for (int x = 0; x < n; x++)
                     global_push_combination(i, j);
             }
         }
-
         for (int i = 0; i < n; i++) {
             if (this->var[i].cand) free(this->var[i].cand);
             if (this->var[i].cand_s) free(this->var[i].cand_s);
@@ -886,12 +885,11 @@ for (int x = 0; x < n; x++)
                 free(this->var[i].comb_value);
             }
         }
-
         // Cycle through the combinations generated for independent variables to make complete ones
-        for (int z = 0; z < this->n_pcv; z++)
+        int npcv = this->n_pcv;
+        for (int z = 0; z < npcv; z++)
         {
             // Cycle through all remaining combinations
-            int npcv = this->n_pcv;
             for (int x = z + 1; x < npcv; x++)
             {
                 bool compat = true, inequal = false;
@@ -975,7 +973,7 @@ for (int x = 0; x < this->n_pcv; x++) {
             int group_match[N_MAX_FILTER_GROUPS], res;
             memset(filter_match, 0, N_MAX_FILTERS*sizeof(bool)); memset(group_match, 0, N_MAX_FILTER_GROUPS*sizeof(int));
             // First, let us check each of the filters
-            bool is_date = false;
+            bool is_date = false, is_string = false;
             for(int i=0; i<this->_n_filters; i++) {
                 char *lvalue = NULL, *rvalue = NULL;
                 if(this->_filters[i].variable[0] == '?') {
@@ -985,6 +983,8 @@ for (int x = 0; x < this->n_pcv; x++) {
                             if (this->pre_comb_value_type[z][x]) {
                                 if (strncmp(this->pre_comb_value_type[z][x], "http://www.w3.org/2001/XMLSchema#date", 37) == 0)
                                     is_date = true;
+                                if (strncmp(this->pre_comb_value_type[z][x], "http://www.w3.org/2001/XMLSchema#string", 39) == 0)
+                                    is_string = true;
                             }
                             break;
                         }
@@ -1001,6 +1001,8 @@ for (int x = 0; x < this->n_pcv; x++) {
                             if (this->pre_comb_value_type[z][x]) {
                                 if (strncmp(this->pre_comb_value_type[z][x], "http://www.w3.org/2001/XMLSchema#date", 37) == 0)
                                     is_date = true;
+                                if (strncmp(this->pre_comb_value_type[z][x], "http://www.w3.org/2001/XMLSchema#string", 39) == 0)
+                                    is_string = true;
                             }
                             break;
                         }
@@ -1010,7 +1012,7 @@ for (int x = 0; x < this->n_pcv; x++) {
                     rvalue = this->_filters[i].value;
                     fixed_rvalue = true;
                 }
-//printf("filter %i, lvalue: %s, rvalue: %s\n", i, lvalue, rvalue);
+//printf("filter %i, lvalue: %s, rvalue: %s, is_date: %i, is_string: %i\n", i, lvalue, rvalue, is_date, is_string);
                 if( (!lvalue || !rvalue ) && this->_filters[i].operation != COMPARE_NOTEXISTS) {
                     incomplete = true;
                     break;
@@ -1119,9 +1121,12 @@ for (int x = 0; x < this->n_pcv; x++) {
                         if (is_date) {
                             if (l_lv > l_rv)
                                 result = true;
-                            break;
                         }
-                        if(atof(lvalue) > atof(rvalue))
+                        else if (is_string) {
+                            if (lvalue[0] > rvalue[0])
+                                result = true;
+                        }
+                        else if (atof(lvalue) > atof(rvalue))
                             result = true;
                         break;
                     case COMPARE_MOREOREQUAL:
@@ -1130,7 +1135,11 @@ for (int x = 0; x < this->n_pcv; x++) {
                                 result = true;
                             break;
                         }
-                        if(atof(lvalue) >= atof(rvalue))
+                        else if (is_string) {
+                            if (lvalue[0] >= rvalue[0])
+                                result = true;
+                        }
+                        else if (atof(lvalue) >= atof(rvalue))
                             result = true;
                         break;
                     case COMPARE_LESS:
@@ -1139,7 +1148,11 @@ for (int x = 0; x < this->n_pcv; x++) {
                                 result = true;
                             break;
                         }
-                        if(atof(lvalue) < atof(rvalue))
+                        else if (is_string) {
+                            if (lvalue[0] < rvalue[0])
+                                result = true;
+                        }
+                        else if (atof(lvalue) < atof(rvalue))
                             result = true;
                         break;
                     case COMPARE_LESSOREQUAL:
@@ -1148,7 +1161,11 @@ for (int x = 0; x < this->n_pcv; x++) {
                                 result = true;
                             break;
                         }
-                        if(atof(lvalue) <= atof(rvalue))
+                        else if (is_string) {
+                            if (lvalue[0] <= rvalue[0])
+                                result = true;
+                        }
+                        else if (atof(lvalue) <= atof(rvalue))
                             result = true;
                         break;
                 }
@@ -1240,7 +1257,7 @@ for (int x = 0; x < this->n_pcv; x++) {
             }
         }
 /*
-printf("\nFiltered combinations:\n");
+printf("\nFiltered combinations: %lu\n", this->n_pcv);
 for (int x = 0; x < this->n_pcv; x++) {
     printf("%i. ", x);
     if (this->pre_comb_value[x][0] == NULL)
@@ -1255,6 +1272,7 @@ for (int x = 0; x < this->n_pcv; x++) {
         // Output complete combinations
         char vars[1024 * N_MAX_VARIABLES], *result;
         bool first = true, first_val = true;
+        unsigned long count = 0;
         result = (char *)malloc(1024 * 3 * this->n_pcv);
         if(!result) utils::out_of_memory();
         // Get rid of incomplete combinations (could be optimized)
@@ -1284,27 +1302,19 @@ for (int x = 0; x < this->n_pcv; x++) {
                     break;
                 }
             }
-            if (!complete) {
-                free(this->pre_comb_value[z]);
-                free(this->pre_comb_value_type[z]);
-                free(this->pre_comb_value_lang[z]);
-                if(this->n_pcv - z - 1 > 0) {
-                    memmove((void*)((long)this->pre_comb_value+z*sizeof(char***)), (void*)((long)this->pre_comb_value+(z+1)*sizeof(char***)), (this->n_pcv - z - 1)*sizeof(char***) );
-                    memmove((void*)((long)this->pre_comb_value_type+z*sizeof(char***)), (void*)((long)this->pre_comb_value_type+(z+1)*sizeof(char***)), (this->n_pcv - z - 1)*sizeof(char***) );
-                    memmove((void*)((long)this->pre_comb_value_lang+z*sizeof(char***)), (void*)((long)this->pre_comb_value_lang+(z+1)*sizeof(char***)), (this->n_pcv - z - 1)*sizeof(char***) );
-                }
-                this->n_pcv--;
-                z--;
-            }
+            if (!complete)
+                this->pre_comb_value[z][0] == NULL;
+            else
+                count++;
         }
         if(this->modifier & MOD_COUNT) {
             char *answer = (char *)malloc(1024);
             if(!answer) utils::out_of_memory();
-            sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, this->n_pcv);
+            sprintf(answer, "{\"Status\":\"Ok\", \"RequestId\":\"%s\", \"Count\":\"%i\"}", this->request_id, count);
             return answer;
         }
         // Sort combinations. Coarse, temporary implementation, could be optimized
-        for(int j=this->_n_orders-1; j>=0; j--) {
+        for(int j = this->_n_orders - 1; j >= 0; j--) {
             if(strcmp(this->_orders[j].direction, "desc") == 0) sort_order = 1;
             else sort_order = 0;
             char **unique = (char**)malloc(this->n_pcv*sizeof(char*));
@@ -1385,33 +1395,46 @@ for (int x = 0; x < this->n_pcv; x++) {
         }
         strcat(vars, "] ");
         first = true;
-        int sent = 0;
+        int sent = 0, spos = strlen(result);
+        char *add = (char*)malloc(65535);
+        count = 0;
         for (int z = 0; z < this->n_pcv; z++) {
-            if (this->offset != -1 && z < this->offset) continue;
+            if (this->pre_comb_value[z][0] == NULL) continue;
+            count++;
+            if (this->offset != -1 && count < this->offset) continue;
             if (this->limit != -1 && sent >= this->limit) break;
             sent++;
-            if (!first)
-                strcat(result, ", ");
+            if (!first) {
+                strcpy((char*)((unsigned long)result + spos), ", ");
+                spos += 2;
+            }
             first = false;
             first_val = true;
-            strcat(result, " [");
+            strcpy((char*)((unsigned long)result + spos), "[ ");
+            spos += 2;
             for (int x = 0; x < n; x++) {
                 int i = order[x];
                 if (this->var[i].notexists)
                     continue;
                 if (this->var[i].obj[0] != '?')
                     continue;
-                if (!first_val)
-                    strcat(result, ", ");
+                if (!first_val) {
+                    strcpy((char*)((unsigned long)result + spos), ", ");
+                    spos += 2;
+                }
                 first_val = false;
                 if (this->pre_comb_value[z][i] == NULL)
-                    sprintf((char *)((unsigned long)result + strlen(result)), "[\"\", \"\", \"\"]");
+                    sprintf(add, "[\"\", \"\", \"\"]");
                 else
-                    sprintf((char *)((unsigned long)result + strlen(result)), "[\"%s\", \"%s\", \"%s\"]", this->pre_comb_value[z][i], this->pre_comb_value_type[z][i] ? this->pre_comb_value_type[z][i] : "", this->pre_comb_value_lang[z][i] ? this->pre_comb_value_lang[z][i] : "");
+                    sprintf(add, "[\"%s\", \"%s\", \"%s\"]", this->pre_comb_value[z][i], this->pre_comb_value_type[z][i] ? this->pre_comb_value_type[z][i] : "", this->pre_comb_value_lang[z][i] ? this->pre_comb_value_lang[z][i] : "");
+                strcpy((char*)((unsigned long)result + spos), add);
+                spos += strlen(add);
             }
-            strcat(result, "]");
+            strcpy((char*)((unsigned long)result + spos), "] ");
+            spos += 2;
         }
-        strcat(result, "] ");
+        free(add);
+        strcpy((char*)((unsigned long)result + spos), "]");
         utils::logger(LOG, "(child) Return triples chain", "", this->n_pcv);
 
         char *answer = (char *)malloc(1024 + strlen(vars) + strlen(result));

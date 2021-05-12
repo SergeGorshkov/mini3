@@ -3,6 +3,7 @@
 #define MULTITHREAD
 #define LISTEN_QUEUES
 //#define PRINT_DIAGNOSTICS
+//#define LOG_REQUESTS
 #define WEBSERVER
 #define VERBOSE
 #include <stdio.h>
@@ -173,13 +174,13 @@ int main(int argc, char **argv)
 				break;
 			}
 /*
-unlink("triples.log");
+//unlink("triples.log");
 FILE *fp = fopen("triples.log", "a");
 fprintf(fp, "\nDumping %lu triples\n", *n_triples);
 for(int i=0; i<*n_triples; i++) {
-	char *s = get_string(triples[i].s_pos);
-	char *p = get_string(triples[i].p_pos);
-	char *o = get_string(triples[i].o_pos);
+	char *s = utils::get_string(triples[i].s_pos);
+	char *p = utils::get_string(triples[i].p_pos);
+	char *o = utils::get_string(triples[i].o_pos);
 	fprintf(fp, "%lx\t%s\t%s\t%s\t%i", triples[i].mini_hash, s, p, o, triples[i].status);
 	if(triples[i].d_pos)
 		fprintf(fp, "\t%s\t%s", utils::get_string(triples[i].d_pos), triples[i].l);
@@ -189,25 +190,25 @@ fprintf(fp, "\nDumping %lu full index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
 	fprintf(fp, "Chunk %lu, %lu items\n", c, chunks_size[c]);
 	for(int i=0; i<chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\n", full_index[c*CHUNK_SIZE + i].mini_hash, full_index[c*CHUNK_SIZE + i].index);
+		fprintf(fp, "%016lx\t%lu\n", full_index[c*(*single_chunk_size) + i].mini_hash, full_index[c*(*single_chunk_size) + i].index);
 }
 fprintf(fp, "\nDumping %lu s-index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
 	fprintf(fp, "Chunk (s) %lu, %lu items\n", c, s_chunks_size[c]);
 	for(int i=0; i<s_chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\t%020lu\n", s_index[c*CHUNK_SIZE + i].mini_hash, s_index[c*CHUNK_SIZE + i].index, s_index[c*CHUNK_SIZE + i].mini_hash);
+		fprintf(fp, "%016lx\t%lu\t%020lu\n", s_index[c*(*single_chunk_size) + i].mini_hash, s_index[c*(*single_chunk_size) + i].index, s_index[c*(*single_chunk_size) + i].mini_hash);
 }
 fprintf(fp, "\nDumping %lu p-index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
 	fprintf(fp, "Chunk (p) %lu, %lu items\n", c, p_chunks_size[c]);
 	for(int i=0; i<p_chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\n", p_index[c*CHUNK_SIZE + i].mini_hash, p_index[c*CHUNK_SIZE + i].index);
+		fprintf(fp, "%016lx\t%lu\t%lu\n", p_index[c*(*single_chunk_size) + i].mini_hash, p_index[c*(*single_chunk_size) + i].index, c*(*single_chunk_size) + i);
 }
 fprintf(fp, "\nDumping %lu o-index\n", *n_triples);
 for(unsigned long c=0; c<*n_chunks; c++) {
 	fprintf(fp, "Chunk (o) %lu, %lu items\n", c, o_chunks_size[c]);
 	for(int i=0; i<o_chunks_size[c]; i++)
-		fprintf(fp, "%lx\t%lu\n", o_index[c*CHUNK_SIZE + i].mini_hash, o_index[c*CHUNK_SIZE + i].index);
+		fprintf(fp, "%lx\t%lu\n", o_index[c*(*single_chunk_size) + i].mini_hash, o_index[c*(*single_chunk_size) + i].index);
 }
 fclose(fp);
 */

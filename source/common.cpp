@@ -531,7 +531,8 @@ class utils {
         }
         n_triples = (unsigned long *)global_block_ul;
         n_prefixes = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long));
-        active_requests = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2);
+        single_chunk_size = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 2);
+        if(*single_chunk_size < INITIAL_CHUNK_SIZE) *single_chunk_size = INITIAL_CHUNK_SIZE;
         allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 3);
         string_allocated = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 4);
         string_length = (unsigned long *)((unsigned long)global_block_ul + sizeof(unsigned long) * 5);
@@ -547,13 +548,13 @@ class utils {
         if (!triples)
             triples = (triple *)mmap_file(mode, DATABASE_FILE, (*allocated) * sizeof(triple));
         if (!full_index)
-            full_index = (mini_index *)mmap_file(mode, INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+            full_index = (mini_index *)mmap_file(mode, INDEX_FILE, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         if (!s_index)
-            s_index = (mini_index *)mmap_file(mode, S_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+            s_index = (mini_index *)mmap_file(mode, S_INDEX_FILE, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         if (!p_index)
-            p_index = (mini_index *)mmap_file(mode, P_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+            p_index = (mini_index *)mmap_file(mode, P_INDEX_FILE, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         if (!o_index)
-            o_index = (mini_index *)mmap_file(mode, O_INDEX_FILE, (*n_chunks) * CHUNK_SIZE * sizeof(mini_index));
+            o_index = (mini_index *)mmap_file(mode, O_INDEX_FILE, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         if (!stringtable)
             stringtable = (char *)mmap_file(mode, STRING_FILE, (*string_allocated));
         sem_post(sem);

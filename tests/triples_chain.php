@@ -10,7 +10,7 @@ function request( $method, $endpoint, $query ) {
     ) );
     $response = file_get_contents( "http://localhost:8082/" . $endpoint, false, $context );
 //echo("Return: ".$response."\n");
-    return json_decode( $response );
+    return $response;
 }
 
 /*
@@ -55,7 +55,7 @@ $req = [ 'RequestId' => '1',
 		    [ 'xsd' => 'http://www.w3.org/2001/XMLSchema#' ],
 		    [ 'foaf' => 'http://xmlns.com/foaf/0.1/' ] ] ];
 $st = microtime(true);
-$res = request( 'PUT', 'prefix', $req );
+$res = json_decode(request( 'PUT', 'prefix', $req ));
 $et = microtime(true);
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
@@ -176,7 +176,7 @@ $req = [    'RequestId' => '2',
             ];
 
 echo("2. PUT triples\n");
-$res = request( 'PUT', 'triple', $req );
+$res = json_decode(request( 'PUT', 'triple', $req ));
 if($res->Status == 'Ok') echo("OK");
 else echo("ERROR!");
 echo(" ".round($et-$st,3)."\n");
@@ -643,10 +643,11 @@ print_r($answers[ $ind ][ 'hasResult' ]);
 */
 	echo($ind . ". ");
 	$st = microtime(true);
-	$res = request('GET', 'chain', $test );
+	$res_raw = request('GET', 'chain', $test );
+	$res = json_decode($res_raw);
 	$et = microtime(true);
 	if($res->Status != 'Ok') {
-		echo("ERROR!");
+		echo("ERROR!\nServer returned: ".$res_raw."\n");
 		continue;
 	}
 

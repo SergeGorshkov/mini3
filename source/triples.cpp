@@ -43,7 +43,7 @@ class triples_index {
     static long _find_using_index(mini_index *idx, unsigned long *n, unsigned long mini_hash, unsigned long *pos, unsigned long *chunk)
     {
         *chunk = mini_hash >> (64 - chunk_bits);
-        unsigned long offset = (*chunk) * CHUNK_SIZE;
+        unsigned long offset = (*chunk) * (*single_chunk_size);
         unsigned long l = offset;
         unsigned long r = offset + n[*chunk];
         unsigned long local_n = n[*chunk];
@@ -57,7 +57,7 @@ class triples_index {
     utils::utils::logger(LOG, message, "", 0); */
         if (n[*chunk] == 0)
         {
-            *pos = (*chunk) * CHUNK_SIZE;
+            *pos = (*chunk) * (*single_chunk_size);
             return -1;
         }
         while (true)
@@ -155,8 +155,7 @@ class triples_index {
         {
             while (ind > 0 && idx[ind - 1].mini_hash == mini_hash)
                 ind--;
-            // TODO: check neighboring chunks for the triples with the same hash
-            while (ind < (*chunk)*CHUNK_SIZE + n[*chunk] && idx[ind].mini_hash == mini_hash)
+            while (ind < (*chunk)*(*single_chunk_size) + n[*chunk] && idx[ind].mini_hash == mini_hash)
             {
                 // TODO: check equality of the strings, not only hashes
                 if (memcmp(triples[idx[ind].index].hash, hash, SHA_DIGEST_LENGTH) == 0) {
@@ -194,7 +193,8 @@ class triples_index {
         unsigned char hash[SHA_DIGEST_LENGTH];
         long ind;
 //printf("search for %s - %s - %s\n", subject, predicate, object);
-        unsigned long mini_hash, pos = 0, chunk = 0, size = 1024, *cand = (unsigned long *)malloc(sizeof(unsigned long *) * size);
+        unsigned long mini_hash, pos = 0, chunk = 0, size = 1024;
+        unsigned long *cand = (unsigned long *)malloc(sizeof(unsigned long *) * size);
         if (!cand) utils::out_of_memory();
         if (subject[0] != '*' && predicate[0] != '*' && object[0] != '*')
         {
@@ -216,7 +216,7 @@ class triples_index {
             if ((*n) >= size)
             {
                 size += 1024;
-                cand = (unsigned long *)realloc(cand, size);
+                cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
             }
             cand[(*n)++] = full_index[ind].index;
         }
@@ -228,14 +228,14 @@ class triples_index {
             {
                 while (ind > 0 && s_index[ind - 1].mini_hash == mini_hash)
                     ind--;
-                while (ind < (*n_chunks) * CHUNK_SIZE && s_index[ind].mini_hash == mini_hash)
+                while (ind < (*n_chunks) * (*single_chunk_size) && s_index[ind].mini_hash == mini_hash)
                 {
                     if (triples[s_index[ind].index].status != 0)
                     {
                         ind++;
                         continue;
                     }
-    //                if(!triples[s_index[ind].index].s_pos) { ind++; continue; }
+//                  if(!triples[s_index[ind].index].s_pos) { ind++; continue; }
                     char *s = utils::get_string(triples[s_index[ind].index].s_pos);
                     if(!s)
                     {
@@ -270,7 +270,7 @@ class triples_index {
                         if ((*n) >= size)
                         {
                             size += 1024;
-                            cand = (unsigned long *)realloc(cand, size);
+                            cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
                         }
                         cand[(*n)++] = s_index[ind].index;
                     }
@@ -286,7 +286,7 @@ class triples_index {
             {
                 while (ind > 0 && o_index[ind - 1].mini_hash == mini_hash)
                     ind--;
-                while (ind < (*n_chunks) * CHUNK_SIZE && o_index[ind].mini_hash == mini_hash)
+                while (ind < (*n_chunks) * (*single_chunk_size) && o_index[ind].mini_hash == mini_hash)
                 {
                     if (triples[o_index[ind].index].status != 0)
                     {
@@ -315,7 +315,7 @@ class triples_index {
                         if ((*n) >= size)
                         {
                             size += 1024;
-                            cand = (unsigned long *)realloc(cand, size);
+                            cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
                         }
                         cand[(*n)++] = o_index[ind].index;
                     }
@@ -331,7 +331,7 @@ class triples_index {
             {
                 while (ind > 0 && p_index[ind - 1].mini_hash == mini_hash)
                     ind--;
-                while (ind < (*n_chunks) * CHUNK_SIZE && p_index[ind].mini_hash == mini_hash)
+                while (ind < (*n_chunks) * (*single_chunk_size) && p_index[ind].mini_hash == mini_hash)
                 {
                     if (triples[p_index[ind].index].status != 0)
                     {
