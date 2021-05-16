@@ -216,8 +216,8 @@
         else if (this->var[j].n_cand % 1024 == 0)
         {
             this->var[j].cand = (char **)realloc(this->var[j].cand, (this->var[j].n_cand / 1024 + 1) * 1024 * sizeof(char *));
-            this->var[j].cand_d = (char **)realloc(this->var[j].cand, (this->var[j].n_cand / 1024 + 1) * 1024 * sizeof(char *));
-            this->var[j].cand_l = (char **)realloc(this->var[j].cand, (this->var[j].n_cand / 1024 + 1) * 1024 * sizeof(char *));
+            this->var[j].cand_d = (char **)realloc(this->var[j].cand_d, (this->var[j].n_cand / 1024 + 1) * 1024 * sizeof(char *));
+            this->var[j].cand_l = (char **)realloc(this->var[j].cand_l, (this->var[j].n_cand / 1024 + 1) * 1024 * sizeof(char *));
             if(!this->var[j].cand || !this->var[j].cand_d || !this->var[j].cand_l) utils::out_of_memory();
         }
         // Add candidate for the j-th variable
@@ -528,6 +528,7 @@
                     if (!found)
                         this->var[ this->var[i].cond_o[j] ].dependent_of[ this->var[ this->var[i].cond_o[j] ].n_dep_of++ ] = i;
                     propagate_dependent(this->var[i].cond_o[j], 1);
+                    if (this->var[i].cond_p[j] == -1) continue;
                     if (this->var[ this->var[i].cond_p[j] ].obj[0] == '?') {
                         found = false;
                         for (int k=0; k<this->var[ this->var[i].cond_p[j] ].n_dep_of; k++) {

@@ -213,7 +213,7 @@ class triples_index {
                 return NULL;
             if (triples[full_index[ind].index].status != 0)
                 return NULL;
-            if ((*n) >= size)
+            if ((*n) >= size - 1)
             {
                 size += 1024;
                 cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
@@ -267,7 +267,7 @@ class triples_index {
                     }
                     if (passed == 2)
                     {
-                        if ((*n) >= size)
+                        if ((*n) >= size - 1)
                         {
                             size += 1024;
                             cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
@@ -312,7 +312,7 @@ class triples_index {
                         passed++;
                     if (passed == 2)
                     {
-                        if ((*n) >= size)
+                        if ((*n) >= size - 1)
                         {
                             size += 1024;
                             cand = (unsigned long *)realloc(cand, size * sizeof(unsigned long *));
@@ -363,10 +363,10 @@ class triples_index {
                     }
                     if (passed == 2)
                     {
-                        if ((*n) >= size)
+                        if ((*n) >= size - 1)
                         {
                             size += 1024;
-                            cand = (unsigned long *)realloc(cand, size);
+                            cand = (unsigned long *)realloc(cand, sizeof(unsigned long *) * size);
                         }
                         cand[(*n)++] = p_index[ind].index;
                     }
@@ -378,13 +378,13 @@ class triples_index {
         {
             for (unsigned long i = 0; i < (*n_triples); i++)
             {
-                if ((*n) >= size)
-                {
-                    size += 1024;
-                    cand = (unsigned long *)realloc(cand, size);
-                }
                 if (triples[i].status != 0)
                     continue;
+                if ((*n) >= size - 1)
+                {
+                    size += 1024;
+                    cand = (unsigned long *)realloc(cand, sizeof(unsigned long *) * size);
+                }
                 cand[(*n)++] = i;
             }
         }

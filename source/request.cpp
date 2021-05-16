@@ -405,8 +405,9 @@ public:
             if (o_index)
                 munmap(o_index, (*n_chunks) * (*single_chunk_size) * sizeof(mini_index));
         }
-        if (stringtable)
-            munmap(stringtable, *string_allocated);
+        // munmap(stringtable) sometimes fails of unknown reason, although file size match
+        //if (stringtable)
+        //    munmap(stringtable, *string_allocated);
         if (global_block_ul)
             munmap(global_block_ul, sizeof(unsigned long) * N_GLOBAL_VARS);
         triples = NULL;
