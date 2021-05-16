@@ -29,6 +29,45 @@ $req = [ 'RequestId' => '0',
 $st = microtime(true);
 request( 'PUT', 'prefix', $req );
 
+$req = [    'RequestId' => '13',
+	    'Chain' => [
+                [ '?person', 'rdfs:label', '?name' ],
+            ],
+	    'Filter' => [
+		'and',
+		[ 'and',
+		    [ '?name', 'contains', 'ia' ]
+		]
+	    ]
+            ];
+
+$st = microtime(true);
+$res_raw = request('GET', 'chain', $req );
+$et = microtime(true);
+$res = json_decode($res_raw);
+if($res->Status == 'Ok') echo("OK ".sizeof($res->Result)."\n");
+else echo("ERROR!\n".$res_raw."\n");
+echo(" ".round($et-$st,3)."\n");
+exit;
+
+$req = [    'RequestId' => '9',
+	    'Chain' => [
+                [ '?article', 'rdf:type', 'bench:Article' ],
+		[ '?article', 'dc:creator', '?person' ],
+		[ '?inproc', 'rdf:type', 'bench:Inproceedings' ],
+		[ '?inproc', 'dc:creator', '?person' ],
+		[ '?person', 'foaf:name', '?name' ]
+            ]
+            ];
+
+$st = microtime(true);
+$res_raw = request('GET', 'chain', $req );
+$et = microtime(true);
+$res = json_decode($res_raw);
+if($res->Status == 'Ok') echo("OK ".sizeof($res->Result)."\n");
+else echo("ERROR!\n".$res_raw."\n");
+echo(" ".round($et-$st,3)."\n");
+
 $req = [    'RequestId' => '7',
 	    'Chain' => [
                 [ '?article1', 'rdf:type', 'bench:Article' ],
