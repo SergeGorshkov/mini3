@@ -1,3 +1,7 @@
+Mini-3 triple store
+
+See product info at https://mini-3.com
+
 Build guide for CentOS
 
 1) Install gcc and standard libraries:
@@ -26,4 +30,4 @@ sudo make install
 5) Run server, for example:
 ./mini3 8082  
 
-
+Feel free to contact us by e-mail: mail@serge-gorshkov.ru

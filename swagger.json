@@ -12,8 +12,8 @@
   "paths": {
     "/prefix": {
       "get": {
-	"tags": ["Prefix"],
-	"summary": "Retrieves all the prefixes defined in database",
+  "tags": ["Prefix"],
+  "summary": "Retrieves all the prefixes defined in database",
         "responses": {
           "200": {
             "description": "Successfully returned list of prefixes",
@@ -39,7 +39,7 @@
       },
       "put": {
         "summary": "Permanently adds prefix(es) to database",
-	"tags": ["Prefix"],
+  "tags": ["Prefix"],
         "parameters": [
           {
             "name": "request",
@@ -78,7 +78,7 @@
       },
       "delete": {
         "summary": "Deletes prefix(es) from database",
-	"tags": ["Prefix"],
+  "tags": ["Prefix"],
         "parameters": [
           {
             "name": "request",
@@ -119,7 +119,7 @@
     "/triple": {
       "get": {
         "summary": "Get the triples matching given conditions",
-	"tags": [ "Triple" ],
+  "tags": [ "Triple" ],
         "parameters": [
           {
             "name": "request",
@@ -158,7 +158,7 @@
       },
       "put": {
         "summary": "Add the triples to database",
-	"tags": [ "Triple" ],
+  "tags": [ "Triple" ],
         "parameters": [
           {
             "name": "request",
@@ -197,7 +197,7 @@
       },
       "delete": {
         "summary": "Delete triples from database. Triples elements may be given explicitly or using * wildcards.",
-	"tags": [ "Triple" ],
+  "tags": [ "Triple" ],
         "parameters": [
           {
             "name": "request",
@@ -238,7 +238,7 @@
     "/triple/count": {
       "get": {
         "summary": "Get number triples matching given conditions",
-	"tags": [ "Triple" ],
+  "tags": [ "Triple" ],
         "parameters": [
           {
             "name": "request",
@@ -279,7 +279,7 @@
     "/chain": {
       "get": {
         "summary": "Get the solutions of the given triples chain pattern",
-	"tags": [ "Chain" ],
+  "tags": [ "Chain" ],
         "parameters": [
           {
             "name": "request",
@@ -289,10 +289,12 @@
             "style": "form",
             "explode": true,
             "schema": {
-              "anyOf": {
-                "$ref": "#/components/schemas/ArrayOfChains",
+              "anyOf": [ {
+                "$ref": "#/components/schemas/ArrayOfChains"
+              },
+              {
                 "$ref": "#/components/schemas/ArrayOfUnionChains"
-              }
+              }]
             }
           }
         ],
@@ -323,7 +325,7 @@
     "/chain/count": {
       "get": {
         "summary": "Get the solutions count of the given triples chain pattern",
-	"tags": [ "Chain" ],
+  "tags": [ "Chain" ],
         "parameters": [
           {
             "name": "request",
@@ -333,10 +335,12 @@
             "style": "form",
             "explode": true,
             "schema": {
-              "anyOf": {
-                "$ref": "#/components/schemas/ArrayOfChains",
+              "anyOf": [ {
+                "$ref": "#/components/schemas/ArrayOfChains"
+              },
+              {
                 "$ref": "#/components/schemas/ArrayOfUnionChains"
-              }
+              }]
             }
           }
         ],
@@ -464,8 +468,8 @@
             "description": "Array of triple patterns. The first element of each pattern is a Subject, the second one is Predicate, the third is an Object, and the fourth is a Lang (optional; make sense only of an Object is a literal). The Subject, Predicate and Object may be given as a full URI, short (prefixed) URI, or * wildcard",
             "items": {
               "type": "array",
-              "minItems": "3",
-              "maxItems": "4",
+              "minItems": 3,
+              "maxItems": 4,
               "items": {
                 "type": "string"
               }
@@ -476,8 +480,8 @@
             "description": "Array of order sequences (optional). The first item of each element is one of [ subject, predicate, object ], the second item is the sort order: asc or desc.",
             "items": {
               "type": "array",
-              "minItems": "2",
-              "maxItems": "2",
+              "minItems": 2,
+              "maxItems": 2,
               "items": {
                 "type": "string"
               }
@@ -506,15 +510,15 @@
               "*"
             ]
           ],
-	  "Order": [
-	    [
-	      "predicate", "asc"
-	    ],
-	    [
-	      "object", "desc"
-	    ]
-	  ],
-	  "Limit": "10"
+    "Order": [
+      [
+        "predicate", "asc"
+      ],
+      [
+        "object", "desc"
+      ]
+    ],
+    "Limit": "10"
         }
       },
       "ArrayOfTriples": {
@@ -529,8 +533,8 @@
             "description": "The first element of each collection is a Subject, the second one is Predicate, the third is an Object, the fourth is a Datatype (XSD datatype, either as the full URI or in the shurctut form), and the fifth is Lang (ISO code of a language). Datatype and Lang are optional; they make sense only of an Object is a literal. The Subject, Predicate and Object may be given as a full URI, short (prefixed) URI",
             "items": {
               "type": "array",
-              "minItems": "3",
-              "maxItems": "5",
+              "minItems": 3,
+              "maxItems": 5,
               "items": {
                 "type": "string"
               }
@@ -570,8 +574,8 @@
             "description": "Array of triples chain elements. The first element of each pattern is a Subject, the second one is Predicate, the third is an Object. Each element may be a full URI, short (prefixed) URI, or a ?variable. The chain construction has generally the same sense as the SPARQL SELECT pattern.",
             "items": {
               "type": "array",
-              "minItems": "3",
-              "maxItems": "3",
+              "minItems": 3,
+              "maxItems": 3,
               "items": {
                 "type": "string"
               }
@@ -584,29 +588,29 @@
               "type": "array",
               "items": {
                 "type": "array",
-		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
-                "minItems": "2",
-                "maxItems": "3",
+    "description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
+                "minItems": 2,
+                "maxItems": 3,
                 "items": {
                   "type": "string"
                 }
               }
             }
           },
-	  "Optional": {
-	    "type": "array",
-	    "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values).",
-	    "items": {
-	      "type": "string"
-	    }
-	  },
+    "Optional": {
+      "type": "array",
+      "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values).",
+      "items": {
+        "type": "string"
+      }
+    },
           "Order": {
             "type": "array",
             "description": "Array of result sorting sequences (optional). The first item of each element is a ?variable, the second item is the sort order: asc or desc.",
             "items": {
               "type": "array",
-              "minItems": "2",
-              "maxItems": "2",
+              "minItems": 2,
+              "maxItems": 2,
               "items": {
                 "type": "string"
               }
@@ -635,16 +639,16 @@
               "?name"
             ]
           ],
-	  "Optional": [ "?name" ],
+    "Optional": [ "?name" ],
           "Filter": [
-	    "and",
+      "and",
             [
               "?personname",
               "notequal",
               "Alice Doe"
             ],
-	    [
-	      "or",
+      [
+        "or",
               [
                 "?personname",
                 "contains",
@@ -655,17 +659,17 @@
                 "icontains",
                 "bob"
               ]
-	    ]
+      ]
           ],
-	  "Order": [
-	    [
-	      "?person", "asc"
-	    ],
-	    [
-	      "?name", "desc"
-	    ]
-	  ],
-	  "Limit": "10"
+    "Order": [
+      [
+        "?person", "asc"
+      ],
+      [
+        "?name", "desc"
+      ]
+    ],
+    "Limit": "10"
         }
       },
       "ArrayOfUnionChains": {
@@ -680,13 +684,13 @@
           },
           "Chain": {
             "type": "array",
-            "description": "Array of arrays of triples chain elements. Each top-level array represents an "UNION" SPARQL request clause. The first element of each nested pattern is a Subject, the second one is Predicate, the third is an Object. Each element may be a full URI, short (prefixed) URI, or a ?variable. The chain construction has generally the same sense as the SPARQL SELECT pattern with UNION clauses.",
+            "description": "Array of arrays of triples chain elements. Each top-level array represents an UNION SPARQL request clause. The first element of each nested pattern is a Subject, the second one is Predicate, the third is an Object. Each element may be a full URI, short (prefixed) URI, or a ?variable. The chain construction has generally the same sense as the SPARQL SELECT pattern with UNION clauses.",
             "items": {
               "type": "array",
               "items": {
                 "type": "array",
-                "minItems": "3",
-                "maxItems": "3",
+                "minItems": 3,
+                "maxItems": 3,
                 "items": {
                   "type": "string"
                 }
@@ -700,29 +704,29 @@
               "type": "array",
               "items": {
                 "type": "array",
-		"description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
-                "minItems": "2",
-                "maxItems": "3",
+    "description": "A filter condition. The first element is the ?variable, the second is an operation (equal, notequal, contains, notcontains, iequal, inotequal, icontains, inotcontains, more, less, moreorequal, lessorequal, notexists), the third is another ?variable or constant. Third element may be empty with notexists operation",
+                "minItems": 2,
+                "maxItems": 3,
                 "items": {
                   "type": "string"
                 }
               }
             }
           },
-	  "Optional": {
-	    "type": "array",
-	    "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values). Do not forget to mention variables as optional if they are present in the UNION clauses, but may not be present in the query result.",
-	    "items": {
-	      "type": "string"
-	    }
-	  },
+    "Optional": {
+      "type": "array",
+      "description": "Array (or array of arrays) of the names of the optional variables. Use array of arrays if the variables can be omitted only simultaneously (all the variables of a subset must all have or don't have values). Do not forget to mention variables as optional if they are present in the UNION clauses, but may not be present in the query result.",
+      "items": {
+        "type": "string"
+      }
+    },
           "Order": {
             "type": "array",
             "description": "Array of result sorting sequences (optional). The first item of each element is a ?variable, the second item is the sort order: asc or desc.",
             "items": {
               "type": "array",
-              "minItems": "2",
-              "maxItems": "2",
+              "minItems": 2,
+              "maxItems": 2,
               "items": {
                 "type": "string"
               }
@@ -770,21 +774,21 @@
               ]
             ]
           ],
-	  "Optional": [ "?language", "?software" ],
+    "Optional": [ "?language", "?software" ],
           "Filter": [
-	    "and",
+      "and",
             [
               "?personname",
               "icontains",
               "doe"
             ]
           ],
-	  "Order": [
-	    [
-	      "?personname", "asc"
-	    ]
-	  ],
-	  "Limit": "10"
+    "Order": [
+      [
+        "?personname", "asc"
+      ]
+    ],
+    "Limit": "10"
         }
       },
       "ArrayOfSolutions": {
@@ -804,8 +808,8 @@
                 "type": "array",
                 "description": "The first element is the value of the variable, the second is datatype, the third is a language (second and third parameters are empty for non-literal values)",
                 "items": {
-                  "minItems": "3",
-                  "maxItems": "3",
+                  "minItems": 3,
+                  "maxItems": 3,
                   "type": "string"
                  }
               }
@@ -814,36 +818,36 @@
         },
         "example": {
           "RequestId": "12345",
-	  "Vars": [
-	    [
-	      "?person",
-	      "?name",
-	    ]
-	  ],
+    "Vars": [
+      [
+        "?person",
+        "?name",
+      ]
+    ],
           "Result": [
             [
               [
-		"http://localhost/JaneDoe",
-		"",
-		""
-	      ],
+    "http://localhost/JaneDoe",
+    "",
+    ""
+        ],
               [
-		"Jane Doe",
-		"xsd:string",
-		"EN"
-	      ]
+    "Jane Doe",
+    "xsd:string",
+    "EN"
+        ]
             ],
             [
               [
-		"http://localhost/JohnDoe",
-		"",
-		""
-	      ],
+    "http://localhost/JohnDoe",
+    "",
+    ""
+        ],
               [
-		"John Doe",
-		"xsd:string",
-		"EN"
-	      ]
+    "John Doe",
+    "xsd:string",
+    "EN"
+        ]
             ]
           ]
         }
@@ -862,7 +866,7 @@
         },
         "example": {
           "RequestId": "12345",
-	  "Count": "10"
+    "Count": "10"
         }
       },
       "InvalidResponse": {

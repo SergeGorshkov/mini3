@@ -1,3 +1,19 @@
+/*
+    This file is part of mini-3 triple store.
+
+    Mini-3 triple store is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Mini-3 triple store is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Mini-3 triple store.  If not, see <https://www.gnu.org/licenses/>.
+*/
 
 class webserver {
 
@@ -76,14 +92,14 @@ class webserver {
 		char *endpos = strstr(buffer, "HTTP/");
 		char c = endpos[0];
 		endpos[0] = 0;
-		if (strstr(buffer, "/prefix") > 0)
+		if ((unsigned long)strstr(buffer, "/prefix") > 0)
 			endpoint = EP_PREFIX;
-		else if (strstr(buffer, "/triple") > 0)
+		else if ((unsigned long)strstr(buffer, "/triple") > 0)
 			endpoint = EP_TRIPLE;
-		else if (strstr(buffer, "/chain") > 0)
+		else if ((unsigned long)strstr(buffer, "/chain") > 0)
 			endpoint = EP_CHAIN;
 		endpos[0] = c;
-		if (strstr(buffer, "/count") > 0)
+		if ((unsigned long)strstr(buffer, "/count") > 0)
 			modifier |= MOD_COUNT;
 		if (!endpoint)
 			utils::logger(FORBIDDEN, "Endpoint is not specified", buffer, fd);
